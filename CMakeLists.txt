@@ -54,7 +54,7 @@ add_executable(run_tests_particle
     ${TEST_DIR}/test_particle.c
     ${TEST_DIR}/unity/src/unity.c
     ${SRC_DIR}/core.c
-    ${SRC_DIR}/particle.c
+    ${SRC_DIR}/cparticle.c
 )
 target_include_directories(run_tests_particle PRIVATE ${SRC_DIR} ${TEST_DIR}/unity/src)
 target_link_libraries(run_tests_particle m)

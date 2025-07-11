@@ -26,7 +26,7 @@ typedef struct {
 
 /** Draws the round. */
 void render(AmmoRound *ammoRound) {
-    buVector3 position = CALL_METHOD(ammoRound->particle, getPosition);
+    buVector3 position = INSTANCE_METHOD(ammoRound->particle, getPosition);
     ShotType type = ammoRound->type;
     buReal radius = -1.0;
     Color color = BLACK;
@@ -73,7 +73,7 @@ void initDemo() {
     // Make all shots unused
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
         shot->type = UNUSED;
-        shot->particle = particleClass.new_instance();
+        shot->particle = CLASS_METHOD(&particleClass,new_instance);
     }
 }
 
@@ -98,19 +98,19 @@ void fire() {
     // Set the properties of the particle
     switch(currentShotType) {
         case PISTOL:
-            CALL_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 35.0f}, (buVector3){0.0f, -1.0f, 0.0f}, 0.9, 1.0/2.0);
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 35.0f}, (buVector3){0.0f, -1.0f, 0.0f}, 0.9, 1.0/2.0);
             break;
 
         case ARTILLERY:
-            CALL_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 30.0f, 40.0f}, (buVector3){0.0f, -20.0f, 0.0f}, 0.99, 1.0/200.0);
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 30.0f, 40.0f}, (buVector3){0.0f, -20.0f, 0.0f}, 0.99, 1.0/200.0);
             break;
 
         case FIREBALL:
-            CALL_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 10.0f}, (buVector3){0.0f, 0.6f, 0.0f}, 0.9, 1.0/1.0);
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 10.0f}, (buVector3){0.0f, 0.6f, 0.0f}, 0.9, 1.0/1.0);
             break;
 
         case LASER:
-            CALL_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 100.0f}, (buVector3){0.0f, 0.0f, 0.0f}, 0.99, 1.0/0.1);
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 100.0f}, (buVector3){0.0f, 0.0f, 0.0f}, 0.99, 1.0/0.1);
             break;
     }
 
@@ -119,7 +119,7 @@ void fire() {
     shot->type = currentShotType;
 
     // Clear the force accumulators
-    CALL_METHOD(shot->particle, cclearAccumulator);
+    INSTANCE_METHOD(shot->particle, cclearAccumulator);
     //clearAccumulator(&shot->particle);
 }
 
@@ -134,10 +134,10 @@ void updateDemo(buReal duration) {
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
         if (shot->type != UNUSED) {
             // Run the physics
-            CALL_METHOD(shot->particle, integrate, duration);
+            INSTANCE_METHOD(shot->particle, integrate, duration);
 
             // Check if the particle is now invalid
-            buVector3 position = CALL_METHOD(shot->particle, getPosition);
+            buVector3 position = INSTANCE_METHOD(shot->particle, getPosition);
             if (position.y < 0.0f ||
                 shot->startTime+5000 < getTiming()->lastFrameTimestamp ||
                 position.z > 200.0f) {

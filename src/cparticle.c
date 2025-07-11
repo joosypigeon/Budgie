@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include "budgie/cparticle.h"
 
+// Method definitions
 
-void integrate(Particle *particle, buReal duration) {
+static void integrate(Particle *particle, buReal duration) {
     //printf("buVector3ParticleIntegrate:enter:duration: " REAL_FMT, duration);
     // Skip integration if particle has infinite mass (i.e. inverse mass is zero or negative)
     if (particle->_inverseMass <= 0.0f) return;
@@ -31,7 +32,7 @@ void integrate(Particle *particle, buReal duration) {
         buPow(particle->_damping, duration));
 }
 
-void set(Particle *particle, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass) {
+static void set(Particle *particle, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass) {
     particle->_position = position;
     particle->_velocity = velocity;
     particle->_acceleration = acceleration;
@@ -39,12 +40,12 @@ void set(Particle *particle, buVector3 position, buVector3 velocity, buVector3 a
     particle->_inverseMass = inverseMass;
 }
 
-void setMass(Particle *particle, const buReal mass) {
+static void setMass(Particle *particle, const buReal mass) {
     assert(mass != 0);
     particle->_inverseMass = ((buReal)1.0)/mass;
 }
 
-buReal getMass(Particle *particle) {
+static buReal getMass(Particle *particle) {
     if (particle->_inverseMass == 0) {
         return REAL_MAX;
     } else {
@@ -52,19 +53,19 @@ buReal getMass(Particle *particle) {
     }
 }
 
-void setInverseMass(Particle *particle, const buReal inverseMass) {
+static void setInverseMass(Particle *particle, const buReal inverseMass) {
     particle->_inverseMass = inverseMass;
 }
 
-buReal getInverseMass(Particle *particle) {
+static buReal getInverseMass(Particle *particle) {
     return particle->_inverseMass;
 }
 
-bool hasFiniteMass(Particle *particle) {
+static bool hasFiniteMass(Particle *particle) {
     return particle->_inverseMass >= 0.0f;
 }
 
-void setDamping(Particle *particle, const buReal damping) {
+static void setDamping(Particle *particle, const buReal damping) {
     particle->_damping = damping;
 }
 
@@ -72,38 +73,39 @@ buReal getDamping(Particle *particle) {
     return particle->_damping;
 }
 
-void setPosition(Particle *particle, const buVector3 position) {
+static void setPosition(Particle *particle, const buVector3 position) {
     particle->_position = position;
 }
 
-buVector3 getPosition(Particle *particle) {
+static buVector3 getPosition(Particle *particle) {
     return particle->_position;
 }
 
-void setVelocity(Particle *particle, const buVector3 velocity) {
+static void setVelocity(Particle *particle, const buVector3 velocity) {
     particle->_velocity = velocity;
 }
 
-buVector3 getVelocity(Particle *particle) {
+static buVector3 getVelocity(Particle *particle) {
     return particle->_velocity;
 }
 
-void setAcceleration(Particle *particle, const buVector3 acceleration) {
+static void setAcceleration(Particle *particle, const buVector3 acceleration) {
     particle->_acceleration = acceleration;
 }
 
-buVector3 getAcceleration(Particle *particle) {
+static buVector3 getAcceleration(Particle *particle) {
     return particle->_acceleration;
 }
 
-void cclearAccumulator(Particle *particle) {
+static void cclearAccumulator(Particle *particle) {
     particle->_forceAccum = (buVector3){0.0, 0.0, 0.0};
 }
 
-void addForce(Particle *particle, const buVector3 force) {
+static void addForce(Particle *particle, const buVector3 force) {
     particle->_forceAccum = buVector3Add(particle->_forceAccum, force);
 }
 
+// all objects of same class have the same singlton vtable object
 static ParticleVTable particle_vtable = {
         .integrate = integrate,
         .set = set,
@@ -124,14 +126,21 @@ static ParticleVTable particle_vtable = {
         .addForce = addForce
 };
 
-static Particle *particle_new_instance(void) {
+// new object
+static Particle *particle_new_instance(ParticleClass *cls) {
     Particle *p = malloc(sizeof(Particle));
-    p->klass = &particleClass;
+    p->klass = cls;
     return p;
+}
+
+// free object
+void particle_free_instance(ParticleClass *cls, Particle *self) {
+    free(self);
 }
 
 ParticleClass particleClass = {
     .class_name = "Particle",
+    .vtable = &particle_vtable,
     .new_instance = particle_new_instance,
-    .vtable = &particle_vtable
+    .free = particle_free_instance
 };
