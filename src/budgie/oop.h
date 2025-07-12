@@ -1,8 +1,10 @@
 #ifndef OOP_H
 #define OOP_h
 
+#define EXPAND(x) x
+
 #define INSTANCE_METHOD(obj, method, ...) \
-    (obj)->klass->vtable->method((obj), ##__VA_ARGS__)
+    ((obj)->klass->vtable->method((obj), ##__VA_ARGS__))
 
 #define CLASS_METHOD(obj, method, ...) \
     (obj)->method((obj), ##__VA_ARGS__)

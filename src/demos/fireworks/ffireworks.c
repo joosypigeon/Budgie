@@ -1,6 +1,6 @@
 #include "../../budgie/oop.h"
 #include "ffireworks.h"
-#include "../../budgie/particle.h"
+#include "../../budgie/cparticle.h"
 #include "../timing.h"
 #include <stdio.h>
 #include "../../budgie/random.h"
@@ -17,7 +17,7 @@ bool pause = false;
 typedef struct {
     unsigned type;
     buReal age;
-    buVector3Particle particle;
+    Particle *particle;
     bool spawn;
 } Firework;
 
@@ -60,11 +60,11 @@ bool updateFirework(Firework *firework, buReal duration) {
     //updateTiming();
 
     // Update our physical state
-    buVector3ParticleIntegrate(&firework->particle, duration);
+    INSTANCE_METHOD(firework->particle, integrate, duration);
 
     // We work backwards from our age to zero.
     firework->age -= duration;
-    return (firework->age < 0) || (firework->particle.position.y < 0);
+    return (firework->age < 0) || (INSTANCE_METHOD(firework->particle, getPosition).y < 0 );
 }
 
 
@@ -96,25 +96,22 @@ void createFireworkFromRule(const FireworkRule *fireworkRule, Firework *child, c
     buVector3 velocity = (buVector3){0};
     if (parent) {
         // The position and velocity are based on the parent.
-        child->particle.position = parent->particle.position;
-        velocity = parent->particle.velocity;
+        buVector3 position = INSTANCE_METHOD(parent->particle, getPosition);
+        INSTANCE_METHOD(child->particle, setPosition, position);
+        velocity = INSTANCE_METHOD(parent->particle, getVelocity);
     } else {
         buVector3 start = (buVector3){
             (buReal)(5 * (buRandomInt(3) - 1)),
             (buReal)0.0,
             (buReal)0.0
         };
-        child->particle.position = start;
+        INSTANCE_METHOD(child->particle, setPosition, start);
     }
-    child->particle.velocity = buVector3Add(velocity, buRandomVectorByRange(&fireworkRule->minVelocity, &fireworkRule->maxVelocity));
-    buVector3 p = child->particle.position;
-    // We use a mass of one in all cases (no point having fireworks
-    // with different masses, since they are only under the influence
-    // of gravity).
-    child->particle.inverseMass = 1.0;
-    child->particle.damping = fireworkRule->damping;
-    child->particle.acceleration = GRAVITY;
-    clearAccumulator(&child->particle);
+    INSTANCE_METHOD(child->particle, setVelocity, buVector3Add(velocity, buRandomVectorByRange(&fireworkRule->minVelocity, &fireworkRule->maxVelocity)));
+    INSTANCE_METHOD(child->particle, setInverseMass, 1.0);
+    INSTANCE_METHOD(child->particle, setDamping, fireworkRule->damping);
+    INSTANCE_METHOD(child->particle, setAcceleration, GRAVITY);
+    INSTANCE_METHOD(child->particle, clearAccumulator);
 }
 
 void initFireworkRules() {
@@ -241,6 +238,7 @@ void init(Application *self) {
     for (Firework *firework = fireworks;
          firework < fireworks+MAX_FIREWORKS;
          firework++) {
+        firework->particle = CLASS_METHOD(&particleClass, new_instance);
         firework->type = 0;
         firework->spawn = false;
     }
@@ -343,7 +341,7 @@ void display(Application *self) {
                 case 9: color = (Color){255,128,128,255}; break;
             };
 
-            buVector3 position = firework->particle.position;
+            buVector3 position = INSTANCE_METHOD(firework->particle, getPosition);
             DrawCube((Vector3){position.x, position.y, position.z}, size, size, size, color);
             DrawCube((Vector3){position.x, -position.y, position.z}, size, size, size, color);// Render the firework's reflection
         }

@@ -114,7 +114,7 @@ void fire() {
     shot->startTime = getTiming()->lastFrameTimestamp;
     shot->type = currentShotType;
     // Clear the force accumulators
-    INSTANCE_METHOD(shot->particle, cclearAccumulator);
+    INSTANCE_METHOD(shot->particle, clearAccumulator);
     //clearAccumulator(&shot->particle);
 }
 

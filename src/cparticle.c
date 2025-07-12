@@ -97,7 +97,7 @@ static buVector3 getAcceleration(Particle *particle) {
     return particle->_acceleration;
 }
 
-static void cclearAccumulator(Particle *particle) {
+static void clearAccumulator(Particle *particle) {
     particle->_forceAccum = (buVector3){0.0, 0.0, 0.0};
 }
 
@@ -122,7 +122,7 @@ static ParticleVTable particle_vtable = {
         .getVelocity = getVelocity,
         .setAcceleration = setAcceleration,
         .getAcceleration = getAcceleration,
-        .cclearAccumulator = cclearAccumulator,
+        .clearAccumulator = clearAccumulator,
         .addForce = addForce
 };
 

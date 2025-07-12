@@ -28,7 +28,7 @@ struct ParticleVTable {
         buVector3 (*getVelocity)(Particle *particle);
         void (*setAcceleration)(Particle *particle, const buVector3 acceleration);
         buVector3 (*getAcceleration)(Particle *particle);
-        void (*cclearAccumulator)(Particle *particle);
+        void (*clearAccumulator)(Particle *particle);
         void (*addForce)(Particle *particle, const buVector3 force);
 };
 
