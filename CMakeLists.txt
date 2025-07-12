@@ -60,20 +60,25 @@ target_include_directories(run_tests_particle PRIVATE ${SRC_DIR} ${TEST_DIR}/uni
 target_link_libraries(run_tests_particle m)
 add_test(NAME BudgieParticleTests COMMAND run_tests_particle)
 
+
+
 # === Define ballistic demo target ===
 set(DEMO_DIR ${SRC_DIR}/demos)
 set(BALLISTIC_DIR ${SRC_DIR}/demos/ballistic)
 
 file(GLOB BALLISTIC_DEMO_SOURCES
-    ${DEMO_DIR}/*.c
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/timing.c
+    ${DEMO_DIR}/main.c
     ${BALLISTIC_DIR}/*.c
 )
 
 # Only include specific core sources (not main.c)
 set(CORE_SOURCES
     ${SRC_DIR}/core.c
-    ${SRC_DIR}/particle.c
     ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/random.c
 )
 
 add_executable(demo_ballistic ${BALLISTIC_DEMO_SOURCES} ${CORE_SOURCES})
@@ -92,13 +97,20 @@ endif()
 
 
 
+
+
+
+
 # === Define fireworks demo target ===
 set(DEMO_DIR ${SRC_DIR}/demos)
 set(FIREWORKS_DIR ${SRC_DIR}/demos/fireworks)
 
 file(GLOB FIREWORKS_DEMO_SOURCES
-    ${DEMO_DIR}/*.c
-    ${FIREWORKS_DIR}/*.c
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/main.c
+    ${FIREWORKS_DIR}/ffireworks.c
+
 )
 
 # Only include specific core sources (not main.c)
@@ -121,6 +133,10 @@ if(OpenMP_C_FOUND)
 else()
     message(WARNING "OpenMP not found; demo_fireworks may fail if OpenMP is used")
 endif()
+
+
+
+
 
 
 
