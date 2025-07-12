@@ -1,5 +1,4 @@
-// ballistic.c
-#include "../demo.h"
+#include "bballistic.h"
 #include "../../budgie/oop.h"
 #include "../../budgie/cparticle.h"
 #include "../timing.h"
@@ -68,7 +67,7 @@ static AmmoRound ammo[AMMO_ROUNDS];
 ShotType currentShotType;
 
 // Method definitions
-void initDemo() {
+void init(Application *self) {
     initTiming();
     // Make all shots unused
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
@@ -81,8 +80,8 @@ void deinitDemo() {
     deinitTiming();
 }
 
-const char* getTitle() {
-    return "Ballistic Demo";
+const char* getTitle(Application *self) {
+    return self->klass->class_name;
 }
 
 void fire() {
@@ -91,10 +90,8 @@ void fire() {
     for (shot = ammo; shot < ammo+ammoRounds; shot++) {
         if (shot->type == UNUSED) break;
     }
-
     // If we didn't find a round, then exit - we can't fire.
     if (shot >= ammo+ammoRounds) return;
-
     // Set the properties of the particle
     switch(currentShotType) {
         case PISTOL:
@@ -113,17 +110,15 @@ void fire() {
             INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 100.0f}, (buVector3){0.0f, 0.0f, 0.0f}, 0.99, 1.0/0.1);
             break;
     }
-
     // Set the data common to all particle types
     shot->startTime = getTiming()->lastFrameTimestamp;
     shot->type = currentShotType;
-
     // Clear the force accumulators
     INSTANCE_METHOD(shot->particle, cclearAccumulator);
     //clearAccumulator(&shot->particle);
 }
 
-void updateDemo(buReal duration) {
+void update(Application *self, buReal duration) {
     //updateTiming();
 
     // Find the duration of the last frame in seconds
@@ -149,7 +144,7 @@ void updateDemo(buReal duration) {
     }
 }
 
-void displayDemo() {
+void display() {
     // Render each particle in turn
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
         if (shot->type != UNUSED) {
@@ -159,7 +154,7 @@ void displayDemo() {
 }
 
 static char *message = "No Ammo Selected";
-void displayInfo(size_t Y, size_t d) {
+void display_info(Application *self, size_t Y, size_t d) {
     // Render the name of the current shot type
     DrawText(TextFormat("Leftclick to fire."), 20, Y , 30, BLUE);
     DrawText(TextFormat(message), 20, Y + d, 30, BLUE);
@@ -178,7 +173,7 @@ void displayInfo(size_t Y, size_t d) {
     
 }
 
-void keyboard(KeyboardKey key) {
+void keyboard(Application *self, KeyboardKey key) {
     switch(key) {
         case KEY_ONE: currentShotType = PISTOL; break;
         case KEY_TWO: currentShotType = ARTILLERY; break;
@@ -187,6 +182,31 @@ void keyboard(KeyboardKey key) {
     }
 }
 
-void mouseButtonPressed(MouseButton mouseButton) {
+void mouseButtonPressed(Application *self, MouseButton mouseButton) {
     if(mouseButton==MOUSE_BUTTON_LEFT) fire();
+}
+
+
+static const ApplicationClass *ballisticClass;
+
+__attribute__((constructor))
+void init_before_main() {
+    printf("init_before_main: enter\n");
+    ballisticClass = CLASS_METHOD(&applicationClass, create_child_class, "Ballistic");
+    ballisticClass->vtable->getTitle = getTitle;
+    //ballisticClass->vtable->initGraphics = initGraphics;
+    ballisticClass->vtable->init = init;
+    //ballisticClass->vtable->setView = setView;
+    //ballisticClass->vtable->deinit = deinit;
+    //ballisticClass->vtable->loop = loop;
+    ballisticClass->vtable->display = display;
+    ballisticClass->vtable->display_info = display_info;
+    ballisticClass->vtable->keyboard = keyboard;
+    ballisticClass->vtable->mouseButtonPressed = mouseButtonPressed;
+    ballisticClass->vtable->update = update;
+    printf("init_before_main: leave\n");
+}
+
+Application *getApplication() {
+    return CLASS_METHOD(ballisticClass, new_instance);
 }

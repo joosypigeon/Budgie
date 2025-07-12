@@ -1,4 +1,5 @@
-#include "../demo.h"
+#include "../../budgie/oop.h"
+#include "ffireworks.h"
 #include "../../budgie/particle.h"
 #include "../timing.h"
 #include <stdio.h>
@@ -235,7 +236,7 @@ void initFireworkRules() {
     // ... and so on for other firework types ...
 }
 
-void initDemo() {
+void init(Application *self) {
     // Make all shots unused
     for (Firework *firework = fireworks;
          firework < fireworks+MAX_FIREWORKS;
@@ -255,7 +256,7 @@ void deinitDemo(unsigned count) {
 }
 
 
-const char* getTitle() {
+const char* getTitle(Application *self) {
     return "Fireworks Demo";
 }
 
@@ -276,7 +277,7 @@ void createFireworks(unsigned type, unsigned number, const Firework *parent) {
     }
 }
 
-void updateDemo(buReal duration) {
+void update(Application *self, buReal duration) {
     // Find the duration of the last frame in seconds
     //float duration = (float)TimingData::get().lastFrameDuration * 0.001f;
     if (duration <= 0.0f) return;
@@ -323,7 +324,7 @@ void updateDemo(buReal duration) {
     }
 }
 
-void displayDemo() {
+void display(Application *self) {
     const static buReal size = 1.0f;
     for (Firework *firework = fireworks;
         firework < fireworks+MAX_FIREWORKS;
@@ -349,7 +350,7 @@ void displayDemo() {
     }
 }
 
-void keyboard(KeyboardKey key) {
+void keyboard(Application *self, KeyboardKey key) {
 
     switch (key) {
         case KEY_ONE: createFireworks(1, 1, NULL); break;
@@ -365,7 +366,30 @@ void keyboard(KeyboardKey key) {
 
     }
 }
-void mouseButtonPressed(MouseButton mouseButton){}
-void displayInfo(size_t Y, size_t d){
+
+void display_info(Application *self, size_t Y, size_t d){
     DrawText(TextFormat("live fireworks: %d", liveFireworks), 20, Y, 30, BLUE);
+}
+
+static const ApplicationClass *fireworksDemoClass;
+
+__attribute__((constructor))
+void init_before_main() {
+    printf("init_before_main: enter\n");
+    fireworksDemoClass = CLASS_METHOD(&applicationClass, create_child_class, "Fireworks Demo");
+    fireworksDemoClass->vtable->getTitle = getTitle;
+    //ballisticClass->vtable->initGraphics = initGraphics;
+    fireworksDemoClass->vtable->init = init;
+    //ballisticClass->vtable->setView = setView;
+    //ballisticClass->vtable->deinit = deinit;
+    //ballisticClass->vtable->loop = loop;
+    fireworksDemoClass->vtable->display = display;
+    fireworksDemoClass->vtable->display_info = display_info;
+    fireworksDemoClass->vtable->keyboard = keyboard;
+    fireworksDemoClass->vtable->update = update;
+    printf("init_before_main: leave\n");
+}
+
+Application *getApplication() {
+    return CLASS_METHOD(fireworksDemoClass, new_instance);
 }

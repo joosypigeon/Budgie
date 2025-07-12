@@ -1,4 +1,4 @@
-#include "unity/src/unity.h"
+#include "../tests/unity/src/unity.h"
 #include "../src/budgie/core.h"
 #include "../src/budgie/oop.h"
 #include "../src/budgie/cparticle.h"
