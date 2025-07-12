@@ -33,7 +33,7 @@ set(DEMO_DIR ${SRC_DIR}/demos)
 set(SOURCES
     ${SRC_DIR}/main.c
     ${SRC_DIR}/core.c
-    ${SRC_DIR}/particle.c
+    ${SRC_DIR}/cparticle.c
 )
 add_executable(budgie ${SOURCES})
 target_include_directories(budgie PRIVATE ${SRC_DIR})
@@ -116,7 +116,7 @@ file(GLOB FIREWORKS_DEMO_SOURCES
 # Only include specific core sources (not main.c)
 set(CORE_SOURCES
     ${SRC_DIR}/core.c
-    ${SRC_DIR}/particle.c
+    ${SRC_DIR}/cparticle.c
     ${SRC_DIR}/random.c
 )
 
