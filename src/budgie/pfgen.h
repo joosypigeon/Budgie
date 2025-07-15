@@ -1,22 +1,5 @@
-/*
- * Interface file for the force generators.
- *
- * Part of the Cyclone physics system.
- *
- * Copyright (c) Icosagon 2003. All Rights Reserved.
- *
- * This software is distributed under licence. Use of this software
- * implies agreement with all terms and conditions of the accompanying
- * software licence.
- */
-
-/**
- * @file
- *
- * This file contains the interface and sample force generators.
- */
-#ifndef CYCLONE_PFGEN_H
-#define CYCLONE_PFGEN_H
+#ifndef PFGEN_H
+#define PFGEN_H
 
 #include "core.h"
 #include "particle.h"
@@ -291,6 +274,6 @@
          */
         void updateForces(real duration);
     };
+}
 
-
-#endif // CYCLONE_PFGEN_H
+#endif // PFGEN_H

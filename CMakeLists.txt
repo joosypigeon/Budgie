@@ -63,6 +63,18 @@ target_link_libraries(run_tests_particle m)
 add_test(NAME BudgieParticleTests COMMAND run_tests_particle)
 
 
+# === Vector test runner ===
+add_executable(run_tests_vector
+    ${TEST_DIR}/test_vector.c
+    ${TEST_DIR}/unity/src/unity.c
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/vector.c
+    ${SRC_DIR}/oop.c
+)
+target_include_directories(run_tests_vector PRIVATE ${SRC_DIR} ${TEST_DIR}/unity/src)
+target_link_libraries(run_tests_vector m)
+add_test(NAME BudgieVectorTests COMMAND run_tests_vector)
+
 
 # === Define ballistic demo target ===
 set(DEMO_DIR ${SRC_DIR}/demos)

@@ -1,6 +1,7 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+#include "oop.h"
 #include <stddef.h>  // for size_t
 
 typedef struct Vector Vector;
@@ -8,6 +9,8 @@ typedef struct VectorClass VectorClass;
 typedef struct VectorVTable VectorVTable;
 
 struct VectorVTable {
+    VTable base; // inherit from VTable
+
     void (*push)(Vector *Vector, void *item);
     void *(*pop)(Vector *Vector);
     void *(*get)(Vector *Vector, size_t i);
@@ -16,7 +19,7 @@ struct VectorVTable {
 };
 
 struct Vector {
-    const VectorClass *klass;
+    Object base;
 
     // private
     size_t _length;
@@ -25,12 +28,7 @@ struct Vector {
 };
 
 struct VectorClass {
-    char *class_name;
-    VectorVTable *vtable;
-    Vector *(*new_instance)(const VectorClass *cls);
-    void (*free)(VectorClass *cls,Vector *self);
-    const VectorClass *(*create_child_class)(const VectorClass *cls, const char *name);
-    const VectorClass *parent;
+    Class base; // inherit from Class
 };
 
 extern VectorClass vectorClass; // singleton object is the class
