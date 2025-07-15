@@ -1,0 +1,2920 @@
+===== ./CMakeLists.txt =====
+cmake_minimum_required(VERSION 3.10)
+project(BudgieCProject C)
+
+# Use C99
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+# Set default build type to Debug if unspecified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING
+        "Choose the type of build (Debug, Release, Testing)" FORCE)
+endif()
+
+# === Define custom Testing build flags ===
+set(CMAKE_C_FLAGS_TESTING "-O1 -g -DTESTING" CACHE STRING "Flags for Testing build")
+set(CMAKE_EXE_LINKER_FLAGS_TESTING "" CACHE STRING "Linker flags for Testing")
+
+# Optional float support
+option(USE_FLOAT "Use float instead of double for buReal" ON)
+if(USE_FLOAT)
+    add_compile_definitions(USE_FLOAT)
+    message(STATUS "Using float precision")
+else()
+    message(STATUS "Using double precision")
+endif()
+
+# === Source folders ===
+set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set(TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+set(DEMO_DIR ${SRC_DIR}/demos)
+
+# === Main app ===
+set(SOURCES
+    ${SRC_DIR}/main.c
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+)
+add_executable(budgie ${SOURCES})
+target_include_directories(budgie PRIVATE ${SRC_DIR})
+target_link_libraries(budgie m)
+
+# === Core test runner ===
+add_executable(run_tests_core
+    ${TEST_DIR}/test_core.c
+    ${TEST_DIR}/unity/src/unity.c
+    ${SRC_DIR}/core.c
+)
+target_include_directories(run_tests_core PRIVATE ${SRC_DIR} ${TEST_DIR}/unity/src)
+target_link_libraries(run_tests_core m)
+add_test(NAME BudgieCoreTests COMMAND run_tests_core)
+
+# === Particle test runner ===
+add_executable(run_tests_particle
+    ${TEST_DIR}/test_particle.c
+    ${TEST_DIR}/unity/src/unity.c
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+)
+target_include_directories(run_tests_particle PRIVATE ${SRC_DIR} ${TEST_DIR}/unity/src)
+target_link_libraries(run_tests_particle m)
+add_test(NAME BudgieParticleTests COMMAND run_tests_particle)
+
+
+
+# === Define ballistic demo target ===
+set(DEMO_DIR ${SRC_DIR}/demos)
+set(BALLISTIC_DIR ${SRC_DIR}/demos/ballistic)
+
+file(GLOB BALLISTIC_DEMO_SOURCES
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/timing.c
+    ${DEMO_DIR}/main.c
+    ${DEMO_DIR}/oop.c
+    ${BALLISTIC_DIR}/*.c
+)
+
+# Only include specific core sources (not main.c)
+set(CORE_SOURCES
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/random.c
+)
+
+add_executable(demo_ballistic ${BALLISTIC_DEMO_SOURCES} ${CORE_SOURCES})
+
+# Raylib + OpenMP linkage
+find_package(raylib REQUIRED)
+target_link_libraries(demo_ballistic raylib m)
+
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    target_link_libraries(demo_ballistic OpenMP::OpenMP_C)
+    message(STATUS "OpenMP found and linked for demo_ballistic")
+else()
+    message(WARNING "OpenMP not found; demo_ballistic may fail if OpenMP is used")
+endif()
+
+
+
+
+
+
+
+# === Define fireworks demo target ===
+set(DEMO_DIR ${SRC_DIR}/demos)
+set(FIREWORKS_DIR ${SRC_DIR}/demos/fireworks)
+
+file(GLOB FIREWORKS_DEMO_SOURCES
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/main.c
+    ${FIREWORKS_DIR}/ffireworks.c
+
+)
+
+# Only include specific core sources (not main.c)
+set(CORE_SOURCES
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/random.c
+)
+
+add_executable(demo_fireworks ${FIREWORKS_DEMO_SOURCES} ${CORE_SOURCES})
+
+# Raylib + OpenMP linkage
+find_package(raylib REQUIRED)
+target_link_libraries(demo_fireworks raylib m)
+
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    target_link_libraries(demo_fireworks OpenMP::OpenMP_C)
+    message(STATUS "OpenMP found and linked for demo_fireworks")
+else()
+    message(WARNING "OpenMP not found; demo_fireworks may fail if OpenMP is used")
+endif()
+
+
+
+
+
+
+
+
+# === Enable testing framework ===
+enable_testing()
+
+# === Show helpful usage when `make` is run with no target ===
+add_custom_target(usage
+    COMMAND ${CMAKE_COMMAND} -E echo ""
+    COMMAND ${CMAKE_COMMAND} -E echo "Available build targets:"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make budgie               # Build the main application"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make run_tests_core       # Build core unit tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make run_tests_particle   # Build particle unit tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make demo_ballistic          # Build Raylib demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "  ctest                     # Run all tests using CTest"
+    COMMAND ${CMAKE_COMMAND} -E echo ""
+    VERBATIM
+)
+
+===== ./src/budgie/core.h =====
+#ifndef CORE_H
+#define CORE_H
+
+#include "precision.h"
+
+typedef union {
+    struct { buReal x, y, z; };
+    buReal v[3];
+} buVector3;
+
+void buCopyFromTo(buVector3 from, buVector3 *to);
+
+typedef struct {
+    buVector3 X;
+    buVector3 Y;
+    buVector3 Z;
+} buCoordinateFrame;
+
+typedef union {
+    struct {
+        buReal r;
+        buReal i;
+        buReal j;
+        buReal k;
+    };
+    buReal data[4];
+} buQuaternion;
+
+extern const buVector3 GRAVITY;
+
+buReal buVector3Norm(buVector3 v);
+buReal buVector3SquareNorm(buVector3 v);
+buVector3 buVector3Normalise(buVector3 v);
+buVector3 buVector3Scalar(buVector3 v, buReal scalar);
+buVector3 buVector3Add(buVector3 a, buVector3 b);
+buVector3 buVector3Difference(buVector3 a, buVector3 b);
+buVector3 buVector3ComponentProduct(buVector3 a, buVector3 b);
+buReal buVector3Dot(buVector3 a, buVector3 b);
+buVector3 buVector3Cross(buVector3 a, buVector3 b);
+buCoordinateFrame buMakeVector3OrthonormalBasis(buVector3 u, buVector3 v, buVector3 w);
+
+void buNormaliseQuaternion(buQuaternion *q);
+#endif // CORE_H
+===== ./src/budgie/cparticle.h =====
+// cparticle.h
+#ifndef CPARTICLE_H
+#define CPARTICLE_H
+
+#include "precision.h"
+#include "core.h"
+#include <stdbool.h>
+
+
+typedef struct Particle Particle;
+typedef struct ParticleClass ParticleClass;
+typedef struct ParticleVTable ParticleVTable;
+
+// methods of object
+struct ParticleVTable {
+        void (*integrate)(Particle *particle, buReal duration);
+        void (*set)(Particle *particle, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass);
+        void (*setMass)(Particle *particle, const buReal mass);
+        buReal (*getMass)(Particle *particle);
+        void (*setInverseMass)(Particle *particle, const buReal inverseMass);
+        buReal (*getInverseMass)(Particle *particle);
+        bool (*hasFiniteMass)(Particle *particle);
+        void (*setDamping)(Particle *particle, const buReal damping);
+        buReal (*getDamping)(Particle *particle);
+        void (*setPosition)(Particle *particle, const buVector3 position);
+        buVector3 (*getPosition)(Particle *particle);
+        void (*setVelocity)(Particle *particle, const buVector3 velocity);
+        buVector3 (*getVelocity)(Particle *particle);
+        void (*setAcceleration)(Particle *particle, const buVector3 acceleration);
+        buVector3 (*getAcceleration)(Particle *particle);
+        void (*clearAccumulator)(Particle *particle);
+        void (*addForce)(Particle *particle, const buVector3 force);
+};
+
+typedef struct Particle {
+    // class object including vtable
+    ParticleClass *klass;
+
+    // private
+    buReal _inverseMass;
+    buReal _damping;
+    buVector3 _position;
+    buVector3 _velocity;
+    buVector3 _forceAccum;
+    buVector3 _acceleration; 
+} Particle;
+
+typedef struct ParticleClass {
+    const char *class_name;
+    ParticleVTable *vtable;
+    Particle *(*new_instance)(ParticleClass *cls); // instantiate new object
+    void (*free)(ParticleClass *cls, Particle *self); // free object
+} ParticleClass;
+
+extern ParticleClass particleClass; // singleton object is the class
+#endif // CPARTICLE_H
+===== ./src/budgie/math_constants.h =====
+#define PI_F 3.1415927f        // float (7 digits)
+#define M_PI 3.14159265358979323846
+#define TAU (2.0 * M_PI)
+#define DEG2RAD (M_PI / 180.0)
+#define RAD2DEG (180.0 / M_PI)
+===== ./src/budgie/oop.h =====
+#ifndef OOP_H
+#define OOP_H
+
+#define INSTANCE_METHOD(obj, method, ...) \
+    ((obj)->klass->vtable->method((obj), ##__VA_ARGS__))
+
+#define CLASS_METHOD(obj, method, ...) \
+    (obj)->method((obj), ##__VA_ARGS__)
+
+#define UNUSED(x) (void)(x)
+
+typedef struct Object Object;
+typedef struct Class Class;
+typedef struct VTable VTable;
+
+struct VTable {
+    const char* (*get_name)(Object *self);
+    const char* (*print)(Object *self);
+    const Class* (*get_class)(Object *self);
+};
+
+struct Object {
+    const Class *klass;
+};
+
+struct Class {
+    char *class_name;
+    VTable *vtable;
+    const Class *parent;
+    Object *(*new_instance)(const Class *cls);
+    void (*free)(Class *cls,Object *self);
+    const Class *(*create_child_class)(const Class *cls, const char *name);
+};
+
+extern const VTable vTable;
+extern const Class class; // singleton object is the class
+
+#endif // OOP_H
+===== ./src/budgie/pfgen.h =====
+#ifndef PFGEN_H
+#define PFGEN_H
+
+#include "precision.h"
+#include "core.h"
+#include "cparticle.h"
+#include "vector.h"
+
+///////////////////////////////////////////
+// ParticleForceGenerator;
+///////////////////////////////////////////
+typedef struct ParticleForceGenerator ParticleForceGenerator;
+typedef struct ParticleForceGeneratorClass ParticleForceGeneratorClass;
+typedef struct ParticleForceGeneratorVTable ParticleForceGeneratorVTable;
+
+struct ParticleForceGeneratorVTable {
+    void (*updateForce)(ParticleForceGenerator *this, Particle *particle, buReal duration);
+};
+
+struct ParticleForceGenerator {
+    const ParticleForceGeneratorClass *klass;
+};
+
+struct ParticleForceGeneratorClass {
+    char *class_name;
+    ParticleForceGeneratorVTable *vtable;
+    ParticleForceGenerator *(*new_instance)(const ParticleForceGeneratorClass *cls);
+    void (*free)(ParticleForceGeneratorClass *cls,ParticleForceGenerator *self);
+    const ParticleForceGeneratorClass *(*create_child_class)(const ParticleForceGeneratorClass *cls, const char *name);
+    const ParticleForceGeneratorClass *parent;
+};
+
+extern ParticleForceGeneratorClass particleForceGeneratorClass; // singleton object is the class
+
+
+///////////////////////////////////////////
+// ParticleForceGenerator;
+///////////////////////////////////////////
+typedef struct ParticleForceRegistry ParticleForceRegistry;
+typedef struct ParticleForceRegistryClass ParticleForceRegistryClass;
+typedef struct ParticleForceRegistryVTable ParticleForceRegistryVTable;
+
+struct ParticleForceRegistryVTable {
+    void (*add)(ParticleForceRegistry *particleForceRegistry, Particle* particle, ParticleForceGenerator *fg);
+    void (*remove)(ParticleForceRegistry *particleForceRegistry, Particle* particle, ParticleForceGenerator *fg);
+    void (*clear)(ParticleForceRegistry *particleForceRegistry);
+    void (*updateForces)(ParticleForceRegistry *particleForceRegistry, buReal duration);
+};
+
+struct ParticleForceRegistry {
+    const ParticleForceRegistryClass *klass;
+
+    Vector *_registrations;
+};
+
+struct ParticleForceRegistryClass {
+    char *class_name;
+    ParticleForceRegistryVTable *vtable;
+    ParticleForceRegistry *(*new_instance)(const ParticleForceRegistryClass *cls);
+    void (*free)(ParticleForceRegistryClass *cls,ParticleForceRegistry *self);
+    const ParticleForceRegistryClass *(*create_child_class)(const ParticleForceRegistryClass *cls, const char *name);
+    const ParticleForceRegistryClass *parent;
+};
+
+extern ParticleForceRegistryClass particleForceRegistryClass;
+
+typedef struct ParticleForceRegistration {
+    Particle *particle;
+    ParticleForceGenerator *fg;
+} ParticleForceRegistration;
+
+#endif // PFGEN_H
+===== ./src/budgie/precision.h =====
+#ifndef PRECISION_H
+#define PRECISION_H
+
+#include <float.h>
+#include <math.h>
+
+#define INT_FMT "%d"
+#define FLOAT_FMT "%f"
+#define DOUBLE_FMT "%f"  // changed from %lf because printf promotes float to double
+
+#ifdef USE_FLOAT
+    typedef float buReal;
+    #define buSqrt sqrtf
+    #define buPow powf
+    #define buAbs fabsf
+    #define buLog logf
+    #define buCos cosf
+    #define REAL_FMT         "%f"
+    #define REAL_MAX         FLT_MAX
+    #define REAL_MIN         FLT_MIN
+    #define REAL_EPSILON     FLT_EPSILON
+    #define REAL_NEG_MIN     (-FLT_MAX)
+#else
+    typedef double buReal;
+    #define REAL_FMT         "%f"   // was %lf — fixed for printf
+    #define buSqrt sqrt
+    #define buPow pow
+    #define buAbs fabs
+    #define buLog log
+    #define buCos cos
+    #define REAL_MAX         DBL_MAX
+    #define REAL_MIN         DBL_MIN
+    #define REAL_EPSILON     DBL_EPSILON
+    #define REAL_NEG_MIN     (-DBL_MAX)
+#endif
+
+#endif // PRECISION_H
+===== ./src/budgie/random.h =====
+#ifndef RANDOM_H
+#define RANDOM_H
+
+#include "core.h"
+#include <stdlib.h>
+
+long buRandCross();
+void buSeed(unsigned seed);
+buReal buRandCrossNormalised();
+buReal buRandomReal(buReal min, buReal max);
+int buRandomInt(unsigned max);
+buReal buRandomBinomial(buReal scale);
+buQuaternion buRandomQuaternion();
+buVector3 buRandomVectorByScale(buReal scale);
+buVector3 buRandomXZVector(buReal scale);
+buVector3 buRandomVectorByVector(const buVector3 *scale);
+buVector3 buRandomVectorByRange(const buVector3 *min, const buVector3 *max);
+buReal buRandomNormal(buReal mean, buReal stddev);
+#endif // RANDOM_H
+
+===== ./src/budgie/vector.h =====
+#ifndef VECTOR_H
+#define VECTOR_H
+
+#include <stddef.h>  // for size_t
+
+typedef struct Vector Vector;
+typedef struct VectorClass VectorClass;
+typedef struct VectorVTable VectorVTable;
+
+struct VectorVTable {
+    void (*push)(Vector *Vector, void *item);
+    void *(*pop)(Vector *Vector);
+    void *(*get)(Vector *Vector, size_t i);
+    void (*set)(Vector *Vector, size_t i, void *item);
+    size_t (*getLength)(Vector *Vector);
+};
+
+struct Vector {
+    const VectorClass *klass;
+
+    // private
+    size_t _length;
+    size_t _max_length;
+    void **_items;
+};
+
+struct VectorClass {
+    char *class_name;
+    VectorVTable *vtable;
+    Vector *(*new_instance)(const VectorClass *cls);
+    void (*free)(VectorClass *cls,Vector *self);
+    const VectorClass *(*create_child_class)(const VectorClass *cls, const char *name);
+    const VectorClass *parent;
+};
+
+extern VectorClass vectorClass; // singleton object is the class
+
+#endif // VECTOR_H
+
+===== ./src/core.c =====
+#include <math.h>
+#include <assert.h>
+#include <stdio.h>
+#include "budgie/core.h"
+
+const buVector3 GRAVITY = { (buReal)0.0, (buReal)-9.81, (buReal)0.0 };
+
+void buCopyFromTo(buVector3 from, buVector3 *to) {
+    to->x = from.x;
+    to->y = from.y;
+    to->z = from.z;
+}
+
+buReal buVector3Norm(buVector3 v) {
+    return buSqrt(v.x*v.x + v.y*v.y +v.z*v.z);
+}
+
+buReal buVector3SquareNorm(buVector3 v) {
+    return v.x*v.x + v.y*v.y + v.z*v.z;
+}
+
+buVector3 buVector3Normalise(buVector3 v) {
+    buReal length = buVector3Norm(v);
+    #ifndef NDEBUG
+        assert(length != 0.0);
+    #endif
+    buVector3 unit;
+    unit.x = v.x/length;
+    unit.y = v.y/length;
+    unit.z = v.z/length;
+    return unit;
+}
+
+buVector3 buVector3Scalar(buVector3 v, buReal scalar) {
+    buVector3 product;
+    product.x = v.x*scalar;
+    product.y = v.y*scalar;
+    product.z = v.z*scalar;
+    return product;
+}
+
+buVector3 buVector3Add(buVector3 a, buVector3 b) {
+    buVector3 sum;
+    sum.x = a.x+b.x;
+    sum.y = a.y+b.y;
+    sum.z = a.z+b.z;
+    return sum;
+}
+
+buVector3 buVector3Difference(buVector3 a, buVector3 b) {
+    buVector3 difference;
+    difference.x = a.x-b.x;
+    difference.y = a.y-b.y;
+    difference.z = a.z-b.z;
+    return difference;
+}
+
+buVector3 buVector3ComponentProduct(buVector3 a, buVector3 b) {
+    buVector3 product;
+    product.x = a.x*b.x;
+    product.y = a.y*b.y;
+    product.z = a.z*b.z;
+    return product;
+}
+
+buReal buVector3Dot(buVector3 a, buVector3 b) {
+    return a.x*b.x+a.y*b.y+a.z*b.z;
+}
+
+buVector3 buVector3Cross(buVector3 a, buVector3 b) {
+    buVector3 product;
+    product.x = a.y*b.z-a.z*b.y;
+    product.y = a.z*b.x-a.x*b.z;
+    product.z = a.x*b.y-a.y*b.x;
+    return product;
+}
+
+
+buCoordinateFrame buMakeVector3OrthonormalBasis(buVector3 u, buVector3 v, buVector3 w) {
+    buCoordinateFrame frame = {0};
+
+    // Ensure input vectors are not zero
+    assert(buVector3SquareNorm(u) != 0.0);
+    assert(buVector3SquareNorm(v) != 0.0);
+    // X: Normalised u
+    frame.X = buVector3Normalise(u);
+    assert(buVector3SquareNorm(frame.X) != 0.0);
+    // Y: Remove component of v along X
+    buVector3 projection = buVector3Scalar(frame.X, buVector3Dot(frame.X, v));
+    frame.Y = buVector3Difference(v, projection);
+    assert(buVector3SquareNorm(frame.Y) != 0.0);
+    frame.Y = buVector3Normalise(frame.Y);
+    // Z: Cross product of X and Y
+    frame.Z = buVector3Cross(frame.X, frame.Y);
+    assert(buVector3Dot(frame.Z, w) > 0.0);
+    return frame;
+}
+
+void buNormaliseQuaternion(buQuaternion *q) {
+    buReal r = q->r, i = q->i, j = q->j, k = q->k;
+    buReal d = r*r+i*i+j*j+k*k;
+    // Check for zero length quaternion, and use the no-rotation
+    // quaternion in that case.
+    if (d < REAL_EPSILON) {
+        q->r = (buReal)1.0;
+        q->r = (buReal)0.0;
+        q->i = (buReal)0.0;
+        q->j = (buReal)0.0;
+        q->k = (buReal)0.0;
+    } else {
+        d = ((buReal)1.0)/buSqrt(d);
+        q->r = r*d;
+        q->i = i*d;
+        q->j = j*d;
+        q->k = k*d;
+    }
+}
+===== ./src/cparticle.c =====
+// cpaticle.c
+#include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
+#include "budgie/cparticle.h"
+
+// Method definitions
+
+static void integrate(Particle *particle, buReal duration) {
+    //printf("buVector3ParticleIntegrate:enter:duration: " REAL_FMT, duration);
+    // Skip integration if particle has infinite mass (i.e. inverse mass is zero or negative)
+    if (particle->_inverseMass <= 0.0f) return;
+
+    // Ensure duration is positive and meaningful
+    assert(duration > 0.0);
+
+    // Step 1: Update position using the current velocity (ignoring acceleration contribution)
+    particle->_position
+        = buVector3Add(
+            particle->_position,
+            buVector3Scalar(particle->_velocity, duration));
+
+    // Step 2: Update velocity using the current acceleration
+    buVector3 velocity
+        = buVector3Add(
+            particle->_velocity,
+            buVector3Scalar(particle->_acceleration, duration));
+
+    // Step 3: Apply damping to the updated velocity
+    particle->_velocity = buVector3Scalar(
+        velocity,
+        buPow(particle->_damping, duration));
+}
+
+static void set(Particle *particle, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass) {
+    particle->_position = position;
+    particle->_velocity = velocity;
+    particle->_acceleration = acceleration;
+    particle->_damping = damping;
+    particle->_inverseMass = inverseMass;
+}
+
+static void setMass(Particle *particle, const buReal mass) {
+    assert(mass != 0);
+    particle->_inverseMass = ((buReal)1.0)/mass;
+}
+
+static buReal getMass(Particle *particle) {
+    if (particle->_inverseMass == 0) {
+        return REAL_MAX;
+    } else {
+        return ((buReal)1.0)/particle->_inverseMass;
+    }
+}
+
+static void setInverseMass(Particle *particle, const buReal inverseMass) {
+    particle->_inverseMass = inverseMass;
+}
+
+static buReal getInverseMass(Particle *particle) {
+    return particle->_inverseMass;
+}
+
+static bool hasFiniteMass(Particle *particle) {
+    return particle->_inverseMass >= 0.0f;
+}
+
+static void setDamping(Particle *particle, const buReal damping) {
+    particle->_damping = damping;
+}
+
+buReal getDamping(Particle *particle) {
+    return particle->_damping;
+}
+
+static void setPosition(Particle *particle, const buVector3 position) {
+    particle->_position = position;
+}
+
+static buVector3 getPosition(Particle *particle) {
+    return particle->_position;
+}
+
+static void setVelocity(Particle *particle, const buVector3 velocity) {
+    particle->_velocity = velocity;
+}
+
+static buVector3 getVelocity(Particle *particle) {
+    return particle->_velocity;
+}
+
+static void setAcceleration(Particle *particle, const buVector3 acceleration) {
+    particle->_acceleration = acceleration;
+}
+
+static buVector3 getAcceleration(Particle *particle) {
+    return particle->_acceleration;
+}
+
+static void clearAccumulator(Particle *particle) {
+    particle->_forceAccum = (buVector3){0.0, 0.0, 0.0};
+}
+
+static void addForce(Particle *particle, const buVector3 force) {
+    particle->_forceAccum = buVector3Add(particle->_forceAccum, force);
+}
+
+// all objects of same class have the same singlton vtable object
+static ParticleVTable particle_vtable = {
+        .integrate = integrate,
+        .set = set,
+        .setMass = setMass,
+        .getMass = getMass,
+        .setInverseMass = setInverseMass,
+        .getInverseMass = getInverseMass,
+        .hasFiniteMass = hasFiniteMass,
+        .setDamping = setDamping,
+        .getDamping = getDamping,
+        .setPosition = setPosition,
+        .getPosition = getPosition,
+        .setVelocity = setVelocity,
+        .getVelocity = getVelocity,
+        .setAcceleration = setAcceleration,
+        .getAcceleration = getAcceleration,
+        .clearAccumulator = clearAccumulator,
+        .addForce = addForce
+};
+
+// new object
+static Particle *particle_new_instance(ParticleClass *cls) {
+    Particle *p = malloc(sizeof(Particle));
+    p->klass = cls;
+    return p;
+}
+
+// free object
+void particle_free_instance(ParticleClass *cls, Particle *self) {
+    free(self);
+}
+
+ParticleClass particleClass = {
+    .class_name = "Particle",
+    .vtable = &particle_vtable,
+    .new_instance = particle_new_instance,
+    .free = particle_free_instance
+};
+===== ./src/demos/aapp.c =====
+#include <assert.h>
+#include "aapp.h"
+
+#include <stdbool.h>
+
+#include "raylib.h"
+
+#include "raymath.h"
+
+#include "rlgl.h"
+#define RLIGHTS_IMPLEMENTATION
+#include "rlights.h"
+
+#if defined(PLATFORM_DESKTOP)
+    #define GLSL_VERSION            330
+#else   // PLATFORM_ANDROID, PLATFORM_WEB
+    #define GLSL_VERSION            100
+#endif
+
+#include <stdlib.h>
+#include <omp.h>
+
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+#include "camera.h"
+
+#include "../budgie/precision.h"
+
+
+int SCREEN_WIDTH;
+int SCREEN_HEIGHT;
+float HALF_SCREEN_WIDTH;
+float HALF_SCREEN_HEIGHT;
+
+// keep the physics fixed time in step with the render frame
+// rate which we don't know in advance
+static float frameTime = 0.0;
+static buReal physics_duration = 0.0;
+static const buReal physics_delta = 1.0 / 600.0;
+static const int max_physics_steps = 100;
+static Camera3D camera = {0};
+static Light lights[MAX_LIGHTS] = { 0 };
+static Shader shader = {0};
+
+static const char *getTitle(Application *self) {
+    return "title";
+}
+
+static void init(Application *self) {
+}
+
+static void initGraphics(Application *self) {
+    printf("initGraphics:enter\n");
+    bool showWireframe = false;
+    size_t frameCounter = 0;
+    size_t CELL_SIZE = 50;
+    printf("Linked Raylib version: %s\n", RAYLIB_VERSION);
+    const int glslVer = rlGetVersion();
+    printf("GL version: %i\n", glslVer);
+
+    //SetConfigFlags(FLAG_FULLSCREEN_MODE);
+    InitWindow(1600, 1200, INSTANCE_METHOD(self, getTitle));
+
+    // Get the primary monitor's resolution before window creation
+    int monitor = GetCurrentMonitor();
+    SCREEN_HEIGHT = GetScreenHeight();
+    SCREEN_WIDTH = GetScreenWidth();
+    printf("Monitor %d: %d x %d\n", GetCurrentMonitor(), GetMonitorWidth(monitor), GetMonitorHeight(monitor));
+    HALF_SCREEN_HEIGHT = SCREEN_HEIGHT/2.0f;
+    HALF_SCREEN_WIDTH = SCREEN_WIDTH/2.0f;
+
+    SetTargetFPS(60);
+
+    INSTANCE_METHOD(self, setView);
+
+    // Load basic lighting shader
+    shader = LoadShader("../src/demos/lighting.vs","../src/demos/lighting.fs");
+    shader.locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
+    // NOTE: "matModel" location name is automatically assigned on shader loading, 
+    // no need to get the location again if using that uniform name
+    
+    // Ambient light level (some basic lighting)
+    int ambientLoc = GetShaderLocation(shader, "ambient");
+    SetShaderValue(shader, ambientLoc, (float[4]){ 0.1f, 0.1f, 0.1f, 1.0f }, SHADER_UNIFORM_VEC4);
+
+    // Create lights
+    lights[0] = CreateLight(LIGHT_POINT, (Vector3){ -HALF_SCREEN_WIDTH, 200, -HALF_SCREEN_HEIGHT }, Vector3Zero(), YELLOW, shader);
+    lights[1] = CreateLight(LIGHT_POINT, (Vector3){ HALF_SCREEN_WIDTH, 200, HALF_SCREEN_HEIGHT }, Vector3Zero(), RED, shader);
+    lights[2] = CreateLight(LIGHT_POINT, (Vector3){ -HALF_SCREEN_WIDTH, 200, HALF_SCREEN_HEIGHT }, Vector3Zero(), GREEN, shader);
+    lights[3] = CreateLight(LIGHT_POINT, (Vector3){ HALF_SCREEN_WIDTH, 200, -HALF_SCREEN_HEIGHT }, Vector3Zero(), BLUE, shader);
+    printf("initGraphics:leave\n");
+}
+
+static void setView(Application *self) {
+    camera.position = (Vector3){ 0.0f, 0.0f, 0.0f};  // Positioned out along +Z axis
+    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };       // Looking at the quad at origin
+    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };           // Standard up direction
+    camera.fovy = 45.0f;
+    camera.projection = CAMERA_PERSPECTIVE;
+}
+
+static void loop(Application *self) {
+    printf("loop:enter\n");
+
+    while (!WindowShouldClose()) {
+
+        frameTime = GetFrameTime();
+        int physics_steps = 0;
+        physics_duration = GetTime(); 
+        while (frameTime > physics_delta) {
+            INSTANCE_METHOD(self, update, physics_delta);
+            frameTime -= physics_delta;
+            physics_steps++;
+            if (physics_steps > max_physics_steps) {
+                frameTime = 0;
+                break;      
+            }
+        }
+        physics_duration = GetTime() - physics_duration;  
+
+        // Update camera
+        UpdateCameraManual(&camera);
+        // Update the shader with the camera view vector (points towards { 0.0f, 0.0f, 0.0f })
+        float cameraPos[3] = { camera.position.x, camera.position.y, camera.position.z };
+        SetShaderValue(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], cameraPos, SHADER_UNIFORM_VEC3);
+
+        // Check key inputs to enable/disable lights
+        if (IsKeyPressed(KEY_Y)) { lights[0].enabled = !lights[0].enabled; }
+        if (IsKeyPressed(KEY_R)) { lights[1].enabled = !lights[1].enabled; }
+        if (IsKeyPressed(KEY_G)) { lights[2].enabled = !lights[2].enabled; }
+        if (IsKeyPressed(KEY_B)) { lights[3].enabled = !lights[3].enabled; }
+        
+        // Update light values (actually, only enable/disable them)
+        for (int i = 0; i < MAX_LIGHTS; i++) UpdateLightValues(shader, lights[i]);
+        size_t Y = 10, d = 60;
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+
+            BeginMode3D(camera);
+
+                rlSetMatrixProjection(MatrixPerspective(
+                    DEG2RAD * camera.fovy,
+                    (float)SCREEN_WIDTH / SCREEN_HEIGHT,
+                    10.0f,     // near clip
+                    10000.0f   // far clip
+                ));
+                
+                BeginShaderMode(shader);
+                    DrawGrid(1000, 10.0f);
+                    KeyboardKey key = GetKeyPressed();
+                    INSTANCE_METHOD(self, keyboard, key);
+                    if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) INSTANCE_METHOD(self, mouseButtonPressed, MOUSE_LEFT_BUTTON);
+                    INSTANCE_METHOD(self, display);
+                EndShaderMode();
+
+                // Draw spheres to show where the lights are
+                for (int i = 0; i < MAX_LIGHTS; i++) {
+                    if (lights[i].enabled) DrawSphereEx(lights[i].position, 10.0f, 8, 8, lights[i].color);
+                    else DrawSphereWires(lights[i].position, 10.0f, 8, 8, ColorAlpha(lights[i].color, 0.3f));
+                }
+            
+            EndMode3D();
+
+            DrawText(TextFormat("physics_steps: %d", physics_steps), 20, Y, 30, BLUE);
+            DrawText(TextFormat("physics_duration: %f", physics_duration), 20, Y + d, 30, BLUE);
+            DrawText(TextFormat("Current Resolution: %d x %d", SCREEN_WIDTH, SCREEN_HEIGHT), 20, Y + 2*d, 30, BLUE);
+            DrawText(TextFormat("Frame Time: %0.2f ms", GetFrameTime() * 1000), 20, Y + 3*d, 30, BLUE);
+            DrawFPS(GetScreenWidth() - 100, 10);
+            INSTANCE_METHOD(self, display_info, Y + 4*d, d);
+        EndDrawing();
+    }
+    CloseWindow();
+    printf("loop:leave\n");
+}
+
+static void display(Application *self) {
+
+}
+
+static void display_info(Application *self, size_t Y, size_t d) {
+
+}
+
+static void deinit(Application *self) {
+
+}
+
+static void keyboard(Application *self, KeyboardKey key) {
+
+}
+
+static void mouseButtonPressed(Application *self, MouseButton button) {
+
+}
+
+static void update(Application *self, buReal physics_delta) {
+
+}
+
+// new object
+static Application *new_instance(const ApplicationClass *cls) {
+    printf("new_instance: enter %p\n", cls);
+    Application *app= malloc(sizeof(Application));
+    assert(app);
+    app->klass = cls;
+    printf("new_instance: leave\n");
+    return app;
+}
+
+// free object
+void application_free_instance(ApplicationClass *cls, Application *self) {
+    free(self);
+}
+
+ApplicationClass *applicationClass = NULL;
+void ApplicationCreateClass() {
+    if(!applicationClass) {
+        applicationClass = malloc(sizeof(ApplicationClass));
+        const char* name = "Application";
+        size_t length = strlen(name);
+        applicationClass->class_name = malloc((length+1)*sizeof(char));
+        assert(applicationClass->class_name);
+        strcpy(applicationClass->class_name, name);
+        applicationClass->parent = &class;
+
+        // add instance methods
+        ApplicationVTable *vtable = malloc(sizeof(ApplicationVTable));
+        vtable->vTable = vTable;
+        vtable->setView = setView;
+        vtable->getTitle = getTitle;
+        vtable->initGraphics = initGraphics;
+        vtable->init = init;
+        vtable->deinit = deinit;
+        vtable->loop = loop;
+        vtable->display = display;
+        vtable->display_info = display_info;
+        vtable->keyboard = keyboard;
+        vtable->mouseButtonPressed = mouseButtonPressed;
+        vtable->update = update;
+
+        applicationClass->vtable = vtable;
+    }
+}
+
+===== ./src/demos/aapp.h =====
+#ifndef AAPP_H
+#define AAPP_H
+
+#include "../budgie/oop.h"
+
+#include "../budgie/precision.h"
+#include <stddef.h>
+#include "raylib.h"
+
+typedef struct Application Application;
+typedef struct ApplicationClass ApplicationClass;
+typedef struct ApplicationVTable ApplicationVTable;
+
+struct ApplicationVTable {
+    VTable vTable;
+    void (*setView)(Application *self);
+    const char *(*getTitle)(Application *self);
+    void (*initGraphics)(Application *self);
+    void (*init)(Application *self);
+    void (*deinit)(Application *self);
+    void (*loop)(Application *self);
+    void (*display)(Application *self);
+    void (*display_info)(Application *self, size_t Y, size_t d);
+    void (*keyboard)(Application *self, KeyboardKey key);
+    void (*mouseButtonPressed)(Application *self, MouseButton button);
+    void (*update)(Application *self, buReal physics_delta);
+};
+
+struct Application {
+    const ApplicationClass *klass;
+
+    // private
+    size_t _height;
+    size_t _width;
+};
+
+struct ApplicationClass {
+    char *class_name;
+    ApplicationVTable *vtable;
+    Application *(*new_instance)(const ApplicationClass *cls);
+    void (*free)(ApplicationClass *cls,Application *self);
+    const ApplicationClass *(*create_child_class)(ApplicationClass *cls, const char *name);
+    const Class *parent;
+};
+
+extern ApplicationClass *applicationClass; // singleton object is the class
+extern void ApplicationCreateClass();
+extern Application *getApplication();
+#endif // AAPP_H
+===== ./src/demos/ballistic/bballistic.c =====
+#include "bballistic.h"
+#include "../../budgie/oop.h"
+#include "../../budgie/cparticle.h"
+#include "../timing.h"
+#include <stdio.h>
+
+#define AMMO_ROUNDS 16
+
+typedef enum {
+    UNUSED = 0,
+    PISTOL,
+    ARTILLERY,
+    FIREBALL,
+    LASER
+} ShotType;
+
+/**
+ * Holds a single ammunition round record.
+ */
+typedef struct {
+    Particle *particle;
+    ShotType type;
+    unsigned startTime;
+} AmmoRound;
+
+/** Draws the round. */
+void render(AmmoRound *ammoRound) {
+    buVector3 position = INSTANCE_METHOD(ammoRound->particle, getPosition);
+    ShotType type = ammoRound->type;
+    buReal radius = -1.0;
+    Color color = BLACK;
+    switch(type) {
+        case PISTOL: 
+            radius = 1.0;
+            color = RED;
+            break;
+        case ARTILLERY:
+            radius = 10.0;
+            color = BLUE;
+            break;
+        case FIREBALL:
+            radius = 10.0;
+            color = YELLOW;
+            break;
+        case LASER:
+            radius = 1.0;
+            color = YELLOW;
+            break;
+        default:
+            radius = 1.0;
+            color = BLACK;
+            break;
+    }
+    DrawSphere((Vector3){position.x, position.y, position.z}, radius, color);
+}
+
+/**
+ * Holds the maximum number of  rounds that can be
+ * fired.
+ */
+static const unsigned ammoRounds = AMMO_ROUNDS;
+
+/** Holds the particle data. */
+static AmmoRound ammo[AMMO_ROUNDS];
+
+/** Holds the current shot type. */
+ShotType currentShotType;
+
+// Method definitions
+void init(Application *self) {
+    initTiming();
+    // Make all shots unused
+    for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
+        shot->type = UNUSED;
+        shot->particle = CLASS_METHOD(&particleClass,new_instance);
+    }
+}
+
+void deinitDemo() {
+    deinitTiming();
+}
+
+const char* getTitle(Application *self) {
+    return self->klass->class_name;
+}
+
+void fire() {
+    // Find the first available round.
+    AmmoRound *shot;
+    for (shot = ammo; shot < ammo+ammoRounds; shot++) {
+        if (shot->type == UNUSED) break;
+    }
+    // If we didn't find a round, then exit - we can't fire.
+    if (shot >= ammo+ammoRounds) return;
+    // Set the properties of the particle
+    switch(currentShotType) {
+        case PISTOL:
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 35.0f}, (buVector3){0.0f, -1.0f, 0.0f}, 0.9, 1.0/2.0);
+            break;
+
+        case ARTILLERY:
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 30.0f, 40.0f}, (buVector3){0.0f, -20.0f, 0.0f}, 0.99, 1.0/200.0);
+            break;
+
+        case FIREBALL:
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 10.0f}, (buVector3){0.0f, 0.6f, 0.0f}, 0.9, 1.0/1.0);
+            break;
+
+        case LASER:
+            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 100.0f}, (buVector3){0.0f, 0.0f, 0.0f}, 0.99, 1.0/0.1);
+            break;
+    }
+    // Set the data common to all particle types
+    shot->startTime = getTiming()->lastFrameTimestamp;
+    shot->type = currentShotType;
+    // Clear the force accumulators
+    INSTANCE_METHOD(shot->particle, clearAccumulator);
+    //clearAccumulator(&shot->particle);
+}
+
+void update(Application *self, buReal duration) {
+    //updateTiming();
+
+    // Find the duration of the last frame in seconds
+    // buReal duration = getTiming()->lastFrameDuration * 0.001f;
+    if (duration <= 0.0f) return;
+
+    // Update the physics of each particle in turn
+    for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
+        if (shot->type != UNUSED) {
+            // Run the physics
+            INSTANCE_METHOD(shot->particle, integrate, duration);
+
+            // Check if the particle is now invalid
+            buVector3 position = INSTANCE_METHOD(shot->particle, getPosition);
+            if (position.y < 0.0f ||
+                shot->startTime+5000 < getTiming()->lastFrameTimestamp ||
+                position.z > 200.0f) {
+                // We simply set the shot type to be unused, so the
+                // memory it occupies can be reused by another shot.
+                shot->type = UNUSED;
+            }
+        }
+    }
+}
+
+void display() {
+    // Render each particle in turn
+    for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
+        if (shot->type != UNUSED) {
+            render(shot);
+        }
+    }
+}
+
+static char *message = "No Ammo Selected";
+void display_info(Application *self, size_t Y, size_t d) {
+    // Render the name of the current shot type
+    DrawText(TextFormat("Leftclick to fire."), 20, Y , 30, BLUE);
+    DrawText(TextFormat(message), 20, Y + d, 30, BLUE);
+    DrawText(TextFormat("Ammo types are . . ."), 20, Y + 2*d, 30, BLUE);
+    switch(currentShotType) {
+        case PISTOL: message = "Current Ammo: Pistol"; break;
+        case ARTILLERY: message = "Current Ammo: Artillery"; break;
+        case FIREBALL: message = "Current Ammo: Fireball"; break;
+        case LASER: message = "Current Ammo: Laser"; break;
+        default: message = "No Ammo Selected";
+    }
+    DrawText(TextFormat("   press 1 for pistol"), 20, Y + 3*d, 30, BLUE);
+    DrawText(TextFormat("   press 2 for artillery"), 20, Y + 4*d, 30, BLUE);
+    DrawText(TextFormat("   press 3 for fireball"), 20, Y + 5*d, 30, BLUE);
+    DrawText(TextFormat("   press 4 for laser"), 20, Y + 6*d, 30, BLUE);
+    
+}
+
+void keyboard(Application *self, KeyboardKey key) {
+    switch(key) {
+        case KEY_ONE: currentShotType = PISTOL; break;
+        case KEY_TWO: currentShotType = ARTILLERY; break;
+        case KEY_THREE: currentShotType = FIREBALL; break;
+        case KEY_FOUR: currentShotType = LASER; break;
+    }
+}
+
+void mouseButtonPressed(Application *self, MouseButton mouseButton) {
+    if(mouseButton==MOUSE_BUTTON_LEFT) fire();
+}
+
+
+static const ApplicationClass *ballisticClass;
+
+__attribute__((constructor))
+void init_before_main() {
+    printf("init_before_main: enter\n");
+    ApplicationCreateClass();// Create Application Class
+    ballisticClass = CLASS_METHOD(applicationClass, create_child_class, "Ballistic");
+    ballisticClass->vtable->getTitle = getTitle;
+    //ballisticClass->vtable->initGraphics = initGraphics;
+    ballisticClass->vtable->init = init;
+    //ballisticClass->vtable->setView = setView;
+    //ballisticClass->vtable->deinit = deinit;
+    //ballisticClass->vtable->loop = loop;
+    ballisticClass->vtable->display = display;
+    ballisticClass->vtable->display_info = display_info;
+    ballisticClass->vtable->keyboard = keyboard;
+    ballisticClass->vtable->mouseButtonPressed = mouseButtonPressed;
+    ballisticClass->vtable->update = update;
+    printf("init_before_main: leave\n");
+}
+
+Application *getApplication() {
+    return CLASS_METHOD(ballisticClass, new_instance);
+}
+===== ./src/demos/ballistic/bballistic.h =====
+#ifndef BBALLISTIC_H
+#define BBALLISTIC_H
+
+#include "../aapp.h"
+
+
+
+Application *getApplication();
+
+
+#endif //BBALLISTIC_H
+===== ./src/demos/camera.c =====
+
+#include "camera.h"
+
+void UpdateCameraManual(Camera3D *camera)
+{
+    static float cameraYaw = PI / 4.0f;
+    static float cameraPitch = PI / 4.0f; 
+    static float cameraDistance = 100.0f;
+    static Vector3 target = { 0.0f, 0.0f, 0.0f };
+
+    float wheel = GetMouseWheelMove();
+    cameraDistance -= wheel * 100.0f;
+    if (cameraDistance < 10.0f) cameraDistance = 10.0f;
+
+    if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
+        Vector2 delta = GetMouseDelta();
+        cameraYaw -= delta.x * 0.01f;
+        cameraPitch += delta.y * 0.01f;
+
+        // Clamp pitch to avoid flipping
+        if (cameraPitch > PI/2.0f - 0.01f) cameraPitch = PI/2.0f - 0.01f;
+        if (cameraPitch < -PI/2.0f + 0.01f) cameraPitch = -PI/2.0f + 0.01f;
+    }
+
+    if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
+        Vector2 delta = GetMouseDelta();
+        float panSpeed = cameraDistance * 0.001f;
+
+        Vector3 right = (Vector3){
+            cosf(cameraYaw), 0.0f, -sinf(cameraYaw)
+        };
+        Vector3 up = (Vector3){ 0.0f, 1.0f, 0.0f };
+
+        target = Vector3Add(target, Vector3Scale(right, -delta.x * panSpeed));
+        target = Vector3Add(target, Vector3Scale(up, delta.y * panSpeed));
+    }
+
+    Vector3 offset = {
+        cameraDistance * cosf(cameraPitch) * sinf(cameraYaw),
+        cameraDistance * sinf(cameraPitch),
+        cameraDistance * cosf(cameraPitch) * cosf(cameraYaw)
+    };
+
+    camera->position = Vector3Add(target, offset);
+    camera->target = target;
+    camera->up = (Vector3){ 0.0f, 1.0f, 0.0f };
+}
+
+
+===== ./src/demos/camera.h =====
+#ifndef CAMERA_H
+#define CAMERA_H
+
+#include "raylib.h"
+#include "raymath.h"
+
+void UpdateCameraManual(Camera3D *camera);
+
+#endif // CAMERA_H
+===== ./src/demos/demo.h =====
+#ifndef DEMO_H
+#define DEMO_H
+
+#include <stddef.h>
+#include "raylib.h"
+#include "../budgie/precision.h"
+
+void initDemo(); // initalise the demo
+void deinitDemo(); // clean up and end demo
+const char* getTitle();/** Returns the window title for the demo. */
+void keyboard(KeyboardKey key);
+void mouseButtonPressed(MouseButton mouseButton);
+void updateDemo(buReal duration);/** Update the particles. */
+void displayDemo();
+void displayInfo(size_t Y, size_t d);
+
+#endif // DEMO_H
+===== ./src/demos/fireworks/ffireworks.c =====
+#include "../../budgie/oop.h"
+#include "ffireworks.h"
+#include "../../budgie/cparticle.h"
+#include "../timing.h"
+#include <stdio.h>
+#include "../../budgie/random.h"
+#include <limits.h>
+#include "raylib.h"
+
+#define MAX_FIREWORKS 10240 /** Holds the maximum number of fireworks that can be in use. */
+#define RULE_COUNT 9 /** And the number of rules. */
+
+unsigned liveFireworks = 0;
+
+bool pause = false;
+
+typedef struct {
+    unsigned type;
+    buReal age;
+    Particle *particle;
+    bool spawn;
+} Firework;
+
+Firework fireworks[MAX_FIREWORKS]; /** Holds the firework data. */
+unsigned nextFirework = UINT_MAX; /** Holds the index of the next firework slot to use. */
+
+/**
+ * The payload is the new firework type to create when this
+ * firework's fuse is over.
+ */
+typedef struct Payload {
+    unsigned type; /** The type of the new particle to create. */
+    unsigned count; /** The number of particles in this payload. */
+} Payload;
+
+/**
+ * Firework rules control the length of a firework's fuse and the
+ * particles it should evolve into.
+ */
+typedef struct FireworkRule {
+    unsigned type; /** The type of firework that is managed by this rule. */
+    buReal minAge; /** The minimum length of the fuse. */
+    buReal maxAge; /** The maximum legnth of the fuse. */
+    buVector3 minVelocity; /** The minimum relative velocity of this firework. */
+    buVector3 maxVelocity; /** The maximum relative velocity of this firework. */
+    buReal damping; /** The damping of this firework type. */
+    unsigned payloadCount; /** The number of payloads for this firework type. */
+    Payload *payloads; /** The set of payloads. */
+} FireworkRule;
+
+/** Holds the set of rules. */
+FireworkRule rules[RULE_COUNT];
+
+/**
+ * Updates the firework by the given duration of time. Returns true
+ * if the firework has reached the end of its life and needs to be
+ * removed.
+ */
+bool updateFirework(Firework *firework, buReal duration) {
+    //updateTiming();
+
+    // Update our physical state
+    INSTANCE_METHOD(firework->particle, integrate, duration);
+
+    // We work backwards from our age to zero.
+    firework->age -= duration;
+    return (firework->age < 0) || (INSTANCE_METHOD(firework->particle, getPosition).y < 0 );
+}
+
+
+/**
+ * Set all the rule parameters in one go.
+ */
+void setParameters(FireworkRule *fireworkRule, unsigned type, buReal minAge, buReal maxAge,
+    buVector3 minVelocity, buVector3 maxVelocity, buReal damping)
+{
+    fireworkRule->type = type;
+    fireworkRule->minAge = minAge;
+    fireworkRule->maxAge = maxAge;
+    fireworkRule->minVelocity = minVelocity;
+    fireworkRule->maxVelocity = maxVelocity;
+    fireworkRule->damping = damping;
+    fireworkRule->payloadCount = 0;
+    fireworkRule->payloads = NULL;
+}
+
+/**
+ * Creates a new firework of this type and writes it into the given
+ * instance. The optional parent firework is used to base position
+ * and velocity on.
+ */
+void createFireworkFromRule(const FireworkRule *fireworkRule, Firework *child, const Firework *parent) {
+    child->type = fireworkRule->type;
+    child->age = buRandomReal(fireworkRule->minAge, fireworkRule->maxAge);
+
+    buVector3 velocity = (buVector3){0};
+    if (parent) {
+        // The position and velocity are based on the parent.
+        buVector3 position = INSTANCE_METHOD(parent->particle, getPosition);
+        INSTANCE_METHOD(child->particle, setPosition, position);
+        velocity = INSTANCE_METHOD(parent->particle, getVelocity);
+    } else {
+        buVector3 start = (buVector3){
+            (buReal)(5 * (buRandomInt(3) - 1)),
+            (buReal)0.0,
+            (buReal)0.0
+        };
+        INSTANCE_METHOD(child->particle, setPosition, start);
+    }
+    INSTANCE_METHOD(child->particle, setVelocity, buVector3Add(velocity, buRandomVectorByRange(&fireworkRule->minVelocity, &fireworkRule->maxVelocity)));
+    INSTANCE_METHOD(child->particle, setInverseMass, 1.0);
+    INSTANCE_METHOD(child->particle, setDamping, fireworkRule->damping);
+    INSTANCE_METHOD(child->particle, setAcceleration, GRAVITY);
+    INSTANCE_METHOD(child->particle, clearAccumulator);
+}
+
+void initFireworkRules() {
+    // Go through the firework types and create their rules.
+    setParameters(
+        rules,
+        1, // type
+        0.5f, 1.4f, // age range
+        (buVector3){-5, 25, -5}, // min velocity
+        (buVector3){5, 100, 5}, // max velocity
+        0.1 // damping
+        );
+    rules[0].payloadCount = 3;
+    rules[0].payloads = malloc(3*sizeof(Payload));
+    rules[0].payloads[0].type = 2;
+    rules[0].payloads[0].count = 1;
+    rules[0].payloads[1].type = 2;
+    rules[0].payloads[1].count = 1;
+    rules[0].payloads[2].type = 2;
+    rules[0].payloads[2].count = 1;
+
+    setParameters(
+        rules+1,
+        2, // type
+        0.5f, 1.0f, // age range
+        (buVector3){-5, 10, -5}, // min velocity
+        (buVector3){5, 20, 5}, // max velocity
+        0.8 // damping
+        );
+    rules[1].payloadCount = 1;
+    rules[1].payloads = malloc(1*sizeof(Payload));
+    rules[1].payloads[0].type = 4;
+    rules[1].payloads[0].count = 2;
+
+    setParameters(
+        rules+2,
+        3, // type
+        0.5f, 1.5f, // age range
+        (buVector3){-5, 5, -5}, // min velocity
+        (buVector3){5, 15, 5}, // max velocity
+        0.1 // damping
+        );
+    rules[2].payloadCount = 0;
+    rules[2].payloads = NULL;
+
+    setParameters(
+        rules+3,
+        4, // type
+        0.25f, 0.5f, // age range
+        (buVector3){-20, 5, -5}, // min velocity
+        (buVector3){20, 5, 5}, // max velocity
+        0.2 // damping
+        );
+    rules[3].payloadCount = 1;
+    rules[3].payloads = malloc(1*sizeof(Payload));
+    rules[3].payloads[0].type = 9;
+    rules[3].payloads[0].count = 10;
+
+    setParameters(
+        rules+4,
+        5, // type
+        0.5f, 1.0f, // age range
+        (buVector3){-20, 2, -5}, // min velocity
+        (buVector3){20, 18, 5}, // max velocity
+        0.01 // damping
+        );
+    rules[4].payloadCount = 1;
+    rules[4].payloads = malloc(1*sizeof(Payload));
+    rules[4].payloads[0].type = 9;
+    rules[4].payloads[0].count = 10;
+
+    setParameters(
+        rules+5,
+        6, // type
+        3, 5, // age range
+        (buVector3){-5, 5, -5}, // min velocity
+        (buVector3){5, 10, 5}, // max velocity
+        0.95 // damping
+        );
+    rules[5].payloadCount = 1;
+    rules[5].payloads = malloc(1*sizeof(Payload));
+    rules[5].payloads[0].type = 1;
+    rules[5].payloads[0].count = 10;;
+
+    setParameters(
+        rules+6,
+        7, // type
+        4, 5, // age range
+        (buVector3){-5, 50, -5}, // min velocity
+        (buVector3){5, 60, 5}, // max velocity
+        0.01 // damping
+        );
+    rules[6].payloadCount = 1;
+    rules[6].payloads = malloc(1*sizeof(Payload));
+    rules[6].payloads[0].type = 1;
+    rules[6].payloads[0].count = 10;
+
+    setParameters(
+        rules+7,
+        8, // type
+        0.25f, 0.5f, // age range
+        (buVector3){-1, 1, -1}, // min velocity
+        (buVector3){1, 2, 1}, // max velocity
+        0.01 // damping
+        );
+    rules[7].payloadCount = 0;
+    rules[7].payloads = NULL;
+
+    setParameters(
+        rules+8,
+        9, // type
+        3, 5, // age range
+        (buVector3){-15, 10, -5}, // min velocity
+        (buVector3){15, 15, 5}, // max velocity
+        0.95 // damping
+        );
+    rules[8].payloadCount = 0;
+    rules[8].payloads = NULL;
+    // ... and so on for other firework types ...
+}
+
+void init(Application *self) {
+    // Make all shots unused
+    for (Firework *firework = fireworks;
+         firework < fireworks+MAX_FIREWORKS;
+         firework++) {
+        firework->particle = CLASS_METHOD(&particleClass, new_instance);
+        firework->type = 0;
+        firework->spawn = false;
+    }
+
+    // Create the firework types
+    initFireworkRules();
+
+    nextFirework = 0;
+}
+
+void deinitDemo(unsigned count) {
+    
+}
+
+
+const char* getTitle(Application *self) {
+    return "Fireworks Demo";
+}
+
+void createFirework(unsigned type, const Firework *parent) {
+    // Get the rule needed to create this firework
+    FireworkRule *rule = rules + (type - 1);
+
+    // Create the firework
+    createFireworkFromRule(rule, fireworks+nextFirework, parent);
+
+    // Increment the index for the next firework
+    nextFirework = (nextFirework + 1) % MAX_FIREWORKS;
+}
+
+void createFireworks(unsigned type, unsigned number, const Firework *parent) {
+    for (unsigned i = 0; i < number; i++) {
+        createFirework(type, parent);
+    }
+}
+
+void update(Application *self, buReal duration) {
+    // Find the duration of the last frame in seconds
+    //float duration = (float)TimingData::get().lastFrameDuration * 0.001f;
+    if (duration <= 0.0f) return;
+
+    if(pause) return;
+
+    #pragma omp parallel for schedule(static)
+    for (Firework *firework = fireworks;
+         firework < fireworks+MAX_FIREWORKS;
+         firework++) {
+        // Check if we need to process this firework.
+        firework->spawn = false;
+        if (firework->type > 0) {
+            firework->spawn = updateFirework(firework, duration);
+        }
+    }
+
+    for (Firework *firework = fireworks;
+         firework < fireworks+MAX_FIREWORKS;
+         firework++) {
+            if(firework->spawn){
+                FireworkRule *rule = rules + (firework->type-1);
+                for (unsigned i = 0; i < rule->payloadCount; i++) {
+                    Payload * payload = rule->payloads + i; 
+                    createFireworks(payload->type, payload->count, firework);
+                }
+                firework->type = 0;
+                firework->spawn = false;
+            }
+    }
+
+    liveFireworks = 0;
+    for (Firework *firework = fireworks;
+         firework < fireworks+MAX_FIREWORKS;
+         firework++) {
+            if(firework->type >0) ++liveFireworks;
+    }
+
+    liveFireworks = 0;
+    for (Firework *firework = fireworks;
+         firework < fireworks+MAX_FIREWORKS;
+         firework++) {
+        if (firework->type > 0) ++liveFireworks;
+    }
+}
+
+void display(Application *self) {
+    const static buReal size = 1.0f;
+    for (Firework *firework = fireworks;
+        firework < fireworks+MAX_FIREWORKS;
+        firework++) {
+        if (firework->type > 0) { // Check if we need to process this firework.
+            Color color = (Color){0};
+            switch (firework->type) {
+                case 1: color = (Color){255,  0,  0,255}; break;
+                case 2: color = (Color){255,128,  0,255}; break;
+                case 3: color = (Color){255,255,  0,255}; break;
+                case 4: color = (Color){  0,255,  0,255}; break;
+                case 5: color = (Color){  0,255,255,255}; break;
+                case 6: color = (Color){102,102,255,255}; break;
+                case 7: color = (Color){255,  0,255,255}; break;
+                case 8: color = (Color){255,255,255,255}; break;
+                case 9: color = (Color){255,128,128,255}; break;
+            };
+
+            buVector3 position = INSTANCE_METHOD(firework->particle, getPosition);
+            DrawCube((Vector3){position.x, position.y, position.z}, size, size, size, color);
+            DrawCube((Vector3){position.x, -position.y, position.z}, size, size, size, color);// Render the firework's reflection
+        }
+    }
+}
+
+void keyboard(Application *self, KeyboardKey key) {
+
+    switch (key) {
+        case KEY_ONE: createFireworks(1, 1, NULL); break;
+        case KEY_TWO: createFireworks(2, 1, NULL); break;
+        case KEY_THREE: createFireworks(3, 1, NULL); break;
+        case KEY_FOUR: createFireworks(4, 1, NULL); break;
+        case KEY_FIVE: createFireworks(5, 1, NULL); break;
+        case KEY_SIX: createFireworks(6, 1, NULL); break;
+        case KEY_SEVEN: createFireworks(7, 1, NULL); break;
+        case KEY_EIGHT: createFireworks(8, 1, NULL); break;
+        case KEY_NINE: createFireworks(9, 1, NULL); break;
+        case KEY_SPACE: pause = !pause; break;
+
+    }
+}
+
+void display_info(Application *self, size_t Y, size_t d){
+    DrawText(TextFormat("live fireworks: %d", liveFireworks), 20, Y, 30, BLUE);
+}
+
+static const ApplicationClass *fireworksDemoClass;
+
+__attribute__((constructor))
+void init_before_main() {
+    printf("init_before_main: enter\n");
+    fireworksDemoClass = CLASS_METHOD(&applicationClass, create_child_class, "Fireworks Demo");
+    fireworksDemoClass->vtable->getTitle = getTitle;
+    //ballisticClass->vtable->initGraphics = initGraphics;
+    fireworksDemoClass->vtable->init = init;
+    //ballisticClass->vtable->setView = setView;
+    //ballisticClass->vtable->deinit = deinit;
+    //ballisticClass->vtable->loop = loop;
+    fireworksDemoClass->vtable->display = display;
+    fireworksDemoClass->vtable->display_info = display_info;
+    fireworksDemoClass->vtable->keyboard = keyboard;
+    fireworksDemoClass->vtable->update = update;
+    printf("init_before_main: leave\n");
+}
+
+Application *getApplication() {
+    return CLASS_METHOD(fireworksDemoClass, new_instance);
+}
+===== ./src/demos/fireworks/ffireworks.h =====
+#ifndef FFIREWORKS_H
+#define FFIREWORKS_H
+
+#include "../aapp.h"
+
+
+
+Application *getApplication();
+
+
+#endif //FFIREWORKS_H
+===== ./src/demos/main.c =====
+#include <stdio.h>
+#include "aapp.h"
+#include "../budgie/oop.h"
+
+void main() {
+    printf("main\n");
+    Application *app = getApplication();
+    INSTANCE_METHOD(app, initGraphics);
+    INSTANCE_METHOD(app, init);
+    INSTANCE_METHOD(app, loop);
+    INSTANCE_METHOD(app, deinit);
+    CLASS_METHOD(applicationClass, free, app);
+}
+===== ./src/demos/rlights.h =====
+/**********************************************************************************************
+*
+*   raylib.lights - Some useful functions to deal with lights data
+*
+*   CONFIGURATION:
+*
+*   #define RLIGHTS_IMPLEMENTATION
+*       Generates the implementation of the library into the included file.
+*       If not defined, the library is in header only mode and can be included in other headers 
+*       or source files without problems. But only ONE file should hold the implementation.
+*
+*   LICENSE: zlib/libpng
+*
+*   Copyright (c) 2017-2024 Victor Fisac (@victorfisac) and Ramon Santamaria (@raysan5)
+*
+*   This software is provided "as-is", without any express or implied warranty. In no event
+*   will the authors be held liable for any damages arising from the use of this software.
+*
+*   Permission is granted to anyone to use this software for any purpose, including commercial
+*   applications, and to alter it and redistribute it freely, subject to the following restrictions:
+*
+*     1. The origin of this software must not be misrepresented; you must not claim that you
+*     wrote the original software. If you use this software in a product, an acknowledgment
+*     in the product documentation would be appreciated but is not required.
+*
+*     2. Altered source versions must be plainly marked as such, and must not be misrepresented
+*     as being the original software.
+*
+*     3. This notice may not be removed or altered from any source distribution.
+*
+**********************************************************************************************/
+
+#ifndef RLIGHTS_H
+#define RLIGHTS_H
+
+//----------------------------------------------------------------------------------
+// Defines and Macros
+//----------------------------------------------------------------------------------
+#define MAX_LIGHTS  4         // Max dynamic lights supported by shader
+
+//----------------------------------------------------------------------------------
+// Types and Structures Definition
+//----------------------------------------------------------------------------------
+
+// Light data
+typedef struct {   
+    int type;
+    bool enabled;
+    Vector3 position;
+    Vector3 target;
+    Color color;
+    float attenuation;
+    
+    // Shader locations
+    int enabledLoc;
+    int typeLoc;
+    int positionLoc;
+    int targetLoc;
+    int colorLoc;
+    int attenuationLoc;
+} Light;
+
+// Light type
+typedef enum {
+    LIGHT_DIRECTIONAL = 0,
+    LIGHT_POINT
+} LightType;
+
+#ifdef __cplusplus
+extern "C" {            // Prevents name mangling of functions
+#endif
+
+//----------------------------------------------------------------------------------
+// Module Functions Declaration
+//----------------------------------------------------------------------------------
+Light CreateLight(int type, Vector3 position, Vector3 target, Color color, Shader shader);   // Create a light and get shader locations
+void UpdateLightValues(Shader shader, Light light);         // Send light properties to shader
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // RLIGHTS_H
+
+
+/***********************************************************************************
+*
+*   RLIGHTS IMPLEMENTATION
+*
+************************************************************************************/
+
+#if defined(RLIGHTS_IMPLEMENTATION)
+
+#include "raylib.h"
+
+//----------------------------------------------------------------------------------
+// Defines and Macros
+//----------------------------------------------------------------------------------
+// ...
+
+//----------------------------------------------------------------------------------
+// Types and Structures Definition
+//----------------------------------------------------------------------------------
+// ...
+
+//----------------------------------------------------------------------------------
+// Global Variables Definition
+//----------------------------------------------------------------------------------
+static int lightsCount = 0;    // Current amount of created lights
+
+//----------------------------------------------------------------------------------
+// Module specific Functions Declaration
+//----------------------------------------------------------------------------------
+// ...
+
+//----------------------------------------------------------------------------------
+// Module Functions Definition
+//----------------------------------------------------------------------------------
+
+// Create a light and get shader locations
+Light CreateLight(int type, Vector3 position, Vector3 target, Color color, Shader shader)
+{
+    Light light = { 0 };
+
+    if (lightsCount < MAX_LIGHTS)
+    {
+        light.enabled = true;
+        light.type = type;
+        light.position = position;
+        light.target = target;
+        light.color = color;
+
+        // NOTE: Lighting shader naming must be the provided ones
+        light.enabledLoc = GetShaderLocation(shader, TextFormat("lights[%i].enabled", lightsCount));
+        light.typeLoc = GetShaderLocation(shader, TextFormat("lights[%i].type", lightsCount));
+        light.positionLoc = GetShaderLocation(shader, TextFormat("lights[%i].position", lightsCount));
+        light.targetLoc = GetShaderLocation(shader, TextFormat("lights[%i].target", lightsCount));
+        light.colorLoc = GetShaderLocation(shader, TextFormat("lights[%i].color", lightsCount));
+
+        UpdateLightValues(shader, light);
+        
+        lightsCount++;
+    }
+
+    return light;
+}
+
+// Send light properties to shader
+// NOTE: Light shader locations should be available 
+void UpdateLightValues(Shader shader, Light light)
+{
+    // Send to shader light enabled state and type
+    SetShaderValue(shader, light.enabledLoc, &light.enabled, SHADER_UNIFORM_INT);
+    SetShaderValue(shader, light.typeLoc, &light.type, SHADER_UNIFORM_INT);
+
+    // Send to shader light position values
+    float position[3] = { light.position.x, light.position.y, light.position.z };
+    SetShaderValue(shader, light.positionLoc, position, SHADER_UNIFORM_VEC3);
+
+    // Send to shader light target position values
+    float target[3] = { light.target.x, light.target.y, light.target.z };
+    SetShaderValue(shader, light.targetLoc, target, SHADER_UNIFORM_VEC3);
+
+    // Send to shader light color values
+    float color[4] = { (float)light.color.r/(float)255, (float)light.color.g/(float)255, 
+                       (float)light.color.b/(float)255, (float)light.color.a/(float)255 };
+    SetShaderValue(shader, light.colorLoc, color, SHADER_UNIFORM_VEC4);
+}
+
+#endif // RLIGHTS_IMPLEMENTATION
+===== ./src/demos/timing.c =====
+/*
+ * Timing functions, frame management and profiling.
+ *
+ * Part of the Cyclone physics system.
+ *
+ * Copyright (c) Ian Millington 2003-2006. All Rights Reserved.
+ *
+ * This software is distributed under licence. Use of this software
+ * implies agreement with all terms and conditions of the accompanying
+ * software licence.
+ */
+
+#include "timing.h"
+
+
+// Hold internal timing data for the performance counter.
+static bool qpcFlag;
+
+#if (__APPLE__ || __unix)
+	#define TIMING_UNIX	1
+
+	#include <stdlib.h>
+	#include <sys/time.h>
+
+	// assume unix based OS
+	typedef unsigned long long	LONGLONG;
+#else
+	#define TIMING_WINDOWS	1
+	// assume windows
+
+	// Import the high performance timer (c. 4ms).
+	#include <windows.h>
+	#include <mmsystem.h>
+
+	static double qpcFrequency;
+#endif
+
+
+
+// Internal time and clock access functions
+unsigned systemTime()
+{
+#if TIMING_UNIX
+	struct timeval tv;
+	gettimeofday(&tv, 0);
+
+	return tv.tv_sec * 1000 + tv.tv_usec/1000;
+
+#else
+    if(qpcFlag)
+    {
+        static LONGLONG qpcMillisPerTick;
+        QueryPerformanceCounter((LARGE_INTEGER*)&qpcMillisPerTick);
+        return (unsigned)(qpcMillisPerTick * qpcFrequency);
+    }
+    else
+    {
+        return unsigned(timeGetTime());
+    }
+#endif
+
+}
+
+unsigned getTime()
+{
+    return systemTime();
+}
+
+#if TIMING_WINDOWS
+unsigned long systemClock()
+{
+    __asm {
+    	rdtsc;
+    }
+}
+#endif
+
+unsigned long getClock()
+{
+
+#if TIMING_UNIX
+	struct timeval tv;
+	gettimeofday(&tv, 0);
+
+	return tv.tv_sec * 1000 + tv.tv_usec/1000;
+#else
+    return systemClock();
+#endif
+}
+
+// Sets up the timing system and registers the performance timer.
+void initTime()
+{
+#if TIMING_UNIX
+    qpcFlag = false;
+#else
+    LONGLONG time;
+
+    qpcFlag = (QueryPerformanceFrequency((LARGE_INTEGER*)&time) > 0);
+
+    // Check if we have access to the performance counter at this
+    // resolution.
+    if (qpcFlag) qpcFrequency = 1000.0 / time;
+#endif
+}
+
+
+// Holds the global frame time that is passed around
+static TimingData *timingData = NULL;
+
+// Retrieves the global frame info instance
+TimingData *getTiming()
+{
+    return timingData;
+}
+
+// Updates the global frame information. Should be called once per frame.
+void updateTiming()
+{
+    if (!timingData) return;
+
+    // Advance the frame number.
+    if (!timingData->isPaused)
+    {
+        timingData->frameNumber++;
+    }
+
+    // Update the timing information.
+    unsigned thisTime = systemTime();
+    timingData->lastFrameDuration = thisTime -
+        timingData->lastFrameTimestamp;
+    timingData->lastFrameTimestamp = thisTime;
+
+    // Update the tick information.
+    unsigned long thisClock = getClock();
+    timingData->lastFrameClockTicks =
+    thisClock - timingData->lastFrameClockstamp;
+    timingData->lastFrameClockstamp = thisClock;
+
+    // Update the RWA frame rate if we are able to.
+    if (timingData->frameNumber > 1) {
+        if (timingData->averageFrameDuration <= 0)
+        {
+            timingData->averageFrameDuration =
+                (double)timingData->lastFrameDuration;
+        }
+        else
+        {
+            // RWA over 100 frames.
+            timingData->averageFrameDuration *= 0.99;
+            timingData->averageFrameDuration +=
+                0.01 * (double)timingData->lastFrameDuration;
+
+            // Invert to get FPS
+            timingData->fps =
+                (float)(1000.0/timingData->averageFrameDuration);
+        }
+    }
+}
+
+void initTiming()
+{
+    // Set up the timing system.
+    initTime();
+
+    // Create the frame info object
+    if (!timingData) timingData = malloc(sizeof(TimingData));
+
+    // Set up the frame info structure.
+    timingData->frameNumber = 0;
+
+    timingData->lastFrameTimestamp = systemTime();
+    timingData->lastFrameDuration = 0;
+
+    timingData->lastFrameClockstamp = getClock();
+    timingData->lastFrameClockTicks = 0;
+
+    timingData->isPaused = false;
+
+    timingData->averageFrameDuration = 0;
+    timingData->fps = 0;
+}
+
+void deinitTiming()
+{
+        free(timingData);
+        timingData = NULL;
+}
+
+===== ./src/demos/timing.h =====
+#ifndef CYCLONE_DEMO_TIMING_H
+#define CYCLONE_DEMO_TIMING_H
+
+#include <stdbool.h>
+/**
+ * Represents all the information that the demo might need about the
+ * timing of the game: current time, fps, frame number, and so on.
+ */
+typedef struct 
+{
+    /** The current render frame. This simply increments. */
+    unsigned frameNumber;
+
+    /**
+     * The timestamp when the last frame ended. Times are
+     * given in milliseconds since some undefined time.
+     */
+    unsigned lastFrameTimestamp;
+
+    /**
+     * The duration of the last frame in milliseconds.
+     */
+    unsigned lastFrameDuration;
+
+    /**
+     * The clockstamp of the end of the last frame.
+     */
+    unsigned long lastFrameClockstamp;
+
+    /**
+     * The duration of the last frame in clock ticks.
+     */
+    unsigned long lastFrameClockTicks;
+
+    /**
+     * Keeps track of whether the rendering is paused.
+     */
+    bool isPaused;
+
+    // Calculated data
+
+    /**
+     * This is a recency weighted average of the frame time, calculated
+     * from frame durations.
+     */
+    double averageFrameDuration;
+
+    /**
+     * The reciprocal of the average frame duration giving the mean
+     * fps over a recency weighted average.
+     */
+    float fps;
+} TimingData;
+
+/**
+ * Gets the global timing data object.
+ */
+TimingData *getTiming();
+
+/**
+ * Updates the timing system, should be called once per frame.
+ */
+void updateTiming();
+
+/**
+ * Initialises the frame information system. Use the overall
+ * init function to set up all modules.
+ */
+void initTiming();
+
+/**
+ * Deinitialises the frame information system.
+ */
+void deinitTiming();
+
+/**
+ * Gets the global system time, in the best resolution possible.
+ * Timing is in milliseconds.
+ */
+unsigned getTime();
+
+/**
+ * Gets the clock ticks since process start.
+ */
+unsigned long getClock();
+#endif // CYCLONE_DEMO_TIMING_H
+
+
+
+===== ./src/main.c =====
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "budgie/core.h"
+
+int main(void){
+
+    buVector3 v = {1.0, 2.0, 3.0};
+    
+    printf("v: (" REAL_FMT ", " REAL_FMT ", " REAL_FMT ")\n", v.x, v.y, v.z);
+
+    return 0;
+
+}
+===== ./src/oop.c =====
+#include "../budgie/oop.h"
+#include <stddef.h>
+
+static const char *get_name(Object *self) {
+    return self->klass->class_name;
+}
+
+static const char *print(Object *self) {
+    return "Object of class root.\n";
+}
+
+static const Class *get_class(Object *self) {
+    return self->klass;
+}
+
+// all objects of same class have the same singlton vtable object
+const VTable vTable = {
+        .get_name = get_name,
+        .print = print
+};
+
+// instantiate object from class 
+static Object *new_instance(const Class *cls) {
+    printf("new_instance: enter %p\n", cls);
+    Object *object= malloc(sizeof(Object));
+    assert(object);
+    object->klass = cls;
+    printf("new_instance: leave\n");
+    return object;
+}
+
+// free object
+void free_instance(Class *cls, Object *self) {
+    free(self);
+}
+
+// After the child class is created, the child's vtable
+// will need to be built by encapusaling the parent 
+// vtable with additional methods included
+// and then override patrent methods as needed
+Class *create_child_class(const Class *cls, const char *name) {
+    Class *child = malloc(sizeof(Class));
+    *child = *cls;
+    size_t length = strlen(name);
+    child->class_name = malloc((length+1)*sizeof(char));
+    assert(child->class_name);
+    strcpy(child->class_name, name);
+    child->parent = cls;
+    printf("create_child_class: cls: %p\n", cls);
+    printf("create_child_class: child: %p\n", child);
+    return child;
+}
+
+
+const Class class = {
+    .class_name = "root",
+    .vtable = &vTable,
+    .parent = NULL,
+    .new_instance = new_instance,
+    .free = free_instance,
+    .create_child_class = create_child_class
+};
+
+
+===== ./src/pfgen.c =====
+#include "budgie/pfgen.h"
+#include "budgie/oop.h"
+
+
+void PFR_updateForces(ParticleForceRegistry *self, buReal duration) {
+    Vector *registrations = self->_registrations;
+    for (size_t i; i < INSTANCE_METHOD(registrations, getLength); i++) {
+        ParticleForceRegistration *item = INSTANCE_METHOD(registrations, get, i);
+        INSTANCE_METHOD(item->fg, updateForce, item->particle, duration);
+    }
+}
+
+void PFR_add(ParticleForceRegistry *self, Particle* particle, ParticleForceGenerator *fg) {
+    Vector *registrations = self->_registrations;
+    ParticleForceRegistration *pfr = malloc(sizeof(ParticleForceRegistration));
+    pfr->particle = particle;
+    pfr->fg = fg;
+    INSTANCE_METHOD(registrations, push, pfr);
+}
+
+void Gravity_updateForce(ParticleForceGenerator *self, Particle* particle, real duration)
+{
+    // Check that we do not have infinite mass
+    if (!particle->hasFiniteMass()) return;
+
+    // Apply the mass-scaled force to the particle
+    particle->addForce(gravity * particle->getMass());
+}
+
+ParticleDrag::ParticleDrag(real k1, real k2)
+: k1(k1), k2(k2)
+{
+}
+
+void ParticleDrag::updateForce(Particle* particle, real duration)
+{
+    Vector3 force;
+    particle->getVelocity(&force);
+
+    // Calculate the total drag coefficient
+    real dragCoeff = force.magnitude();
+    dragCoeff = k1 * dragCoeff + k2 * dragCoeff * dragCoeff;
+
+    // Calculate the final force and apply it
+    force.normalise();
+    force *= -dragCoeff;
+    particle->addForce(force);
+}
+
+ParticleSpring::ParticleSpring(Particle *other, real sc, real rl)
+: other(other), springConstant(sc), restLength(rl)
+{
+}
+
+void ParticleSpring::updateForce(Particle* particle, real duration)
+{
+    // Calculate the vector of the spring
+    Vector3 force;
+    particle->getPosition(&force);
+    force -= other->getPosition();
+
+    // Calculate the magnitude of the force
+    real magnitude = force.magnitude();
+    magnitude = real_abs(magnitude - restLength);
+    magnitude *= springConstant;
+
+    // Calculate the final force and apply it
+    force.normalise();
+    force *= -magnitude;
+    particle->addForce(force);
+}
+
+ParticleBuoyancy::ParticleBuoyancy(real maxDepth,
+                                 real volume,
+                                 real waterHeight,
+                                 real liquidDensity)
+:
+maxDepth(maxDepth), volume(volume),
+waterHeight(waterHeight), liquidDensity(liquidDensity)
+{
+}
+
+void ParticleBuoyancy::updateForce(Particle* particle, real duration)
+{
+    // Calculate the submersion depth
+    real depth = particle->getPosition().y;
+
+    // Check if we're out of the water
+    if (depth >= waterHeight + maxDepth) return;
+    Vector3 force(0,0,0);
+
+    // Check if we're at maximum depth
+    if (depth <= waterHeight - maxDepth)
+    {
+        force.y = liquidDensity * volume;
+        particle->addForce(force);
+        return;
+    }
+
+    // Otherwise we are partly submerged
+    force.y = liquidDensity * volume *
+        (depth - maxDepth - waterHeight) / (2 * maxDepth);
+    particle->addForce(force);
+}
+
+ParticleBungee::ParticleBungee(Particle *other, real sc, real rl)
+: other(other), springConstant(sc), restLength(rl)
+{
+}
+
+void ParticleBungee::updateForce(Particle* particle, real duration)
+{
+    // Calculate the vector of the spring
+    Vector3 force;
+    particle->getPosition(&force);
+    force -= other->getPosition();
+
+    // Check if the bungee is compressed
+    real magnitude = force.magnitude();
+    if (magnitude <= restLength) return;
+
+    // Calculate the magnitude of the force
+    magnitude = springConstant * (restLength - magnitude);
+
+    // Calculate the final force and apply it
+    force.normalise();
+    force *= -magnitude;
+    particle->addForce(force);
+}
+
+ParticleFakeSpring::ParticleFakeSpring(Vector3 *anchor, real sc, real d)
+: anchor(anchor), springConstant(sc), damping(d)
+{
+}
+
+void ParticleFakeSpring::updateForce(Particle* particle, real duration)
+{
+    // Check that we do not have infinite mass
+    if (!particle->hasFiniteMass()) return;
+
+    // Calculate the relative position of the particle to the anchor
+    Vector3 position;
+    particle->getPosition(&position);
+    position -= *anchor;
+
+    // Calculate the constants and check they are in bounds.
+    real gamma = 0.5f * real_sqrt(4 * springConstant - damping*damping);
+    if (gamma == 0.0f) return;
+    Vector3 c = position * (damping / (2.0f * gamma)) +
+        particle->getVelocity() * (1.0f / gamma);
+
+    // Calculate the target position
+    Vector3 target = position * real_cos(gamma * duration) +
+        c * real_sin(gamma * duration);
+    target *= real_exp(-0.5f * duration * damping);
+
+    // Calculate the resulting acceleration and therefore the force
+    Vector3 accel = (target - position) * ((real)1.0 / (duration*duration)) -
+        particle->getVelocity() * ((real)1.0/duration);
+    particle->addForce(accel * particle->getMass());
+}
+
+ParticleAnchoredSpring::ParticleAnchoredSpring()
+{
+}
+
+ParticleAnchoredSpring::ParticleAnchoredSpring(Vector3 *anchor,
+                                               real sc, real rl)
+: anchor(anchor), springConstant(sc), restLength(rl)
+{
+}
+
+void ParticleAnchoredSpring::init(Vector3 *anchor, real springConstant,
+                                  real restLength)
+{
+    ParticleAnchoredSpring::anchor = anchor;
+    ParticleAnchoredSpring::springConstant = springConstant;
+    ParticleAnchoredSpring::restLength = restLength;
+}
+
+void ParticleAnchoredBungee::updateForce(Particle* particle, real duration)
+{
+    // Calculate the vector of the spring
+    Vector3 force;
+    particle->getPosition(&force);
+    force -= *anchor;
+
+    // Calculate the magnitude of the force
+    real magnitude = force.magnitude();
+    if (magnitude < restLength) return;
+
+    magnitude = magnitude - restLength;
+    magnitude *= springConstant;
+
+    // Calculate the final force and apply it
+    force.normalise();
+    force *= -magnitude;
+    particle->addForce(force);
+}
+
+void ParticleAnchoredSpring::updateForce(Particle* particle, real duration)
+{
+    // Calculate the vector of the spring
+    Vector3 force;
+    particle->getPosition(&force);
+    force -= *anchor;
+
+    // Calculate the magnitude of the force
+    real magnitude = force.magnitude();
+    magnitude = (restLength - magnitude) * springConstant;
+
+    // Calculate the final force and apply it
+    force.normalise();
+    force *= magnitude;
+    particle->addForce(force);
+}
+
+
+
+static const ParticleForceGeneratorClass *particleGravityClass;
+static const ParticleForceGeneratorClass *ParticleDragClass;
+static const ParticleForceGeneratorClass *ParticleSpringClass;
+static const ParticleForceGeneratorClass *ParticleBuoyancyClass;
+static const ParticleForceGeneratorClass *ParticleBungeeClass;
+static const ParticleForceGeneratorClass *ParticleAnchoredBungeeClass;
+static const ParticleForceGeneratorClass *ParticleAnchoredSpringClass;
+
+
+__attribute__((constructor))
+void init_before_main() {
+    printf("init_before_main: enter\n");
+    ballisticClass = CLASS_METHOD(&applicationClass, create_child_class, "Ballistic");
+    ballisticClass->vtable->getTitle = getTitle;
+    //ballisticClass->vtable->initGraphics = initGraphics;
+    ballisticClass->vtable->init = init;
+    //ballisticClass->vtable->setView = setView;
+    //ballisticClass->vtable->deinit = deinit;
+    //ballisticClass->vtable->loop = loop;
+    ballisticClass->vtable->display = display;
+    ballisticClass->vtable->display_info = display_info;
+    ballisticClass->vtable->keyboard = keyboard;
+    ballisticClass->vtable->mouseButtonPressed = mouseButtonPressed;
+    ballisticClass->vtable->update = update;
+    printf("init_before_main: leave\n");
+}
+===== ./src/random.c =====
+#include "budgie/random.h"  // Cross-platform random number support
+#include <math.h>
+#include "budgie/math_constants.h"
+#include "budgie/core.h"
+
+// Detect platform
+#if defined(_WIN32) || defined(_WIN64)
+    #define PLATFORM_WINDOWS
+#else
+    #define PLATFORM_POSIX
+#endif
+
+// Cross-platform random number generator
+long buRandCross() {
+#ifdef PLATFORM_POSIX
+    return random();  // Better RNG (usually 0 to 2^31-1)
+#else
+    return rand();    // Fallback (typically 0 to 32767)
+#endif
+}
+
+// Optional: seed function
+void buSeed(unsigned seed) {
+#ifdef PLATFORM_POSIX
+    srandom(seed);
+#else
+    srand(seed);
+#endif
+}
+
+// Define RAND_MAX_CROSS for the maximum possible value
+#ifdef PLATFORM_POSIX
+    #define RAND_MAX_CROSS 2147483647L  // POSIX random() uses 2^31 - 1
+#else
+    #define RAND_MAX_CROSS RAND_MAX     // system-defined, typically 32767
+#endif
+
+buReal buRandCrossNormalised() {
+    return (buReal)buRandCross() / ((buReal)RAND_MAX_CROSS + 1.0);
+}
+
+buReal buRandomReal(buReal min, buReal max) {
+    return min + buRandCrossNormalised() * (max - min);
+}
+
+int buRandomInt(unsigned max) {
+    return (int)buRandCross() % max;
+}
+
+buReal buRandomBinomial(buReal scale) {
+    return (buRandCrossNormalised()-buRandCrossNormalised())*scale;
+}
+
+buQuaternion buRandomQuaternion() {
+    buQuaternion q = (buQuaternion) {
+                        buRandCrossNormalised(),
+                        buRandCrossNormalised(),
+                        buRandCrossNormalised(),
+                        buRandCrossNormalised()};
+    buNormaliseQuaternion(&q);
+    return q;
+}
+
+buVector3 buRandomVectorByScale(buReal scale) {
+    return (buVector3) {
+        buRandomBinomial(scale),
+        buRandomBinomial(scale),
+        buRandomBinomial(scale)};
+}
+
+buVector3 buRandomXZVector(buReal scale) {
+    return (buVector3) {
+        buRandomBinomial(scale),
+        (buReal)0.0,
+        buRandomBinomial(scale)};
+}
+
+buVector3 buRandomVectorByVector(const buVector3 *scale)
+{
+    return (buVector3) {
+        buRandomBinomial(scale->x),
+        buRandomBinomial(scale->y),
+        buRandomBinomial(scale->z)};
+}
+
+buVector3 buRandomVectorByRange(const buVector3 *min, const buVector3 *max)
+{
+    return (buVector3) {
+        buRandomReal(min->x, max->x),
+        buRandomReal(min->y, max->y),
+        buRandomReal(min->z, max->z)};
+}
+
+
+/**
+ * Generate a normally distributed (Gaussian) random float
+ * using the Box-Muller transform.
+ *
+ * @param mean   The mean (μ) of the distribution
+ * @param stddev The standard deviation (σ)
+ * @return A random float drawn from N(mean, stddev^2)
+ */
+buReal buRandomNormal(buReal mean, buReal stddev) {
+    // Generate two independent uniform random floats in (0, 1)
+    // Add 1.0 and divide by RAND_MAX + 2.0 to avoid 0.0 or 1.0 edge cases
+    buReal u1 = ((buReal)buRandCross() + 1.0) / ((buReal)RAND_MAX_CROSS + 2.0);
+    buReal u2 = ((buReal)buRandCross() + 1.0) / ((buReal)RAND_MAX_CROSS + 2.0);
+
+    // Perform Box-Muller transform to get a standard normal deviate
+    buReal z0 = buSqrt(-2.0 * buLog(u1)) * buCos(2.0 * M_PI * u2);
+
+    // Scale and shift to desired mean and standard deviation
+    return z0 * stddev + mean;
+}
+===== ./src/vector.c =====
+#include "vector.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+
+Vector *createVector() {
+    Vector *vector = malloc(sizeof(Vector));
+    assert(vector);  // Check for allocation failure
+    vector->length = 0;
+    vector->max_length = 1;
+    vector->items = malloc(sizeof(void *) * vector->max_length);
+    assert(vector->items);  // Check for allocation failure
+    return vector;
+}
+
+void push(Vector *vector, void *item) {
+    if (vector->length >= vector->max_length) {
+        vector->max_length *= 2;
+        void **items = realloc(vector->items, vector->max_length * sizeof(void *));
+        assert(items);
+        vector->items = items;
+    }
+    vector->items[vector->length++] = item;
+}
+
+void *pop(Vector *vector) {
+    if (vector->length == 0) return NULL;
+    return vector->items[--vector->length];
+}
+
+void *get(Vector *vector, size_t i) {
+    assert(i < vector->length);
+    return vector->items[i];
+}
+
+void set(Vector *vector, size_t i, void *item) {
+    assert(i < vector->length);
+    vector->items[i] = item;
+}
+
+size_t getLength(Vector *vector) {
+    return vector->length;
+}
+
+void freeVector(Vector *vector) {
+    if (vector) {
+        free(vector->items);
+        free(vector);
+    }
+}
+
+===== ./tests/test_core.c =====
+#include "unity/src/unity.h"
+#include "../src/budgie/core.h"
+#include <math.h>
+
+#define EPSILON 1e-6
+
+void setUp(void) {}
+void tearDown(void) {}
+
+void test_buVector3Norm(void) {
+    buVector3 v = {3.0, 4.0, 0.0};
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 5.0, buVector3Norm(v));
+}
+
+void test_buVector3SquareNorm(void) {
+    buVector3 v = {1.0, 2.0, 2.0};
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 9.0, buVector3SquareNorm(v));
+}
+
+void test_buVector3Normalise(void) {
+    buVector3 v = {0.0, 3.0, 4.0};
+    buVector3 u = buVector3Normalise(v);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, u.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.6, u.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.8, u.z);
+}
+
+void test_buVector3Scalar(void) {
+    buVector3 v = {1.0, -2.0, 0.5};
+    buVector3 s = buVector3Scalar(v, 2.0);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 2.0, s.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, -4.0, s.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, s.z);
+}
+
+void test_buVector3Add(void) {
+    buVector3 a = {1.0, 2.0, 3.0};
+    buVector3 b = {4.0, 5.0, 6.0};
+    buVector3 r = buVector3Add(a, b);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 5.0, r.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 7.0, r.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 9.0, r.z);
+}
+
+void test_buVector3Difference(void) {
+    buVector3 a = {5.0, 4.0, 3.0};
+    buVector3 b = {1.0, 1.0, 1.0};
+    buVector3 r = buVector3Difference(a, b);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 4.0, r.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 3.0, r.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 2.0, r.z);
+}
+
+void test_buVector3ComponentProduct(void) {
+    buVector3 a = {1.0, 2.0, 3.0};
+    buVector3 b = {4.0, 0.5, -1.0};
+    buVector3 r = buVector3ComponentProduct(a, b);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 4.0, r.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, r.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, -3.0, r.z);
+}
+
+void test_buVector3Dot(void) {
+    buVector3 a = {1.0, 2.0, 3.0};
+    buVector3 b = {4.0, -5.0, 6.0};
+    buReal d = buVector3Dot(a, b);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 12.0, d);  // 1*4 + 2*(-5) + 3*6 = 12
+}
+
+void test_buVector3Cross(void) {
+    buVector3 a = {1.0, 0.0, 0.0};
+    buVector3 b = {0.0, 1.0, 0.0};
+    buVector3 c = buVector3Cross(a, b);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, c.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, c.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, c.z);
+}
+
+void test_buMakeVector3OrthonormalBasis_XYZ_orthonormal(void) {
+    buVector3 u = {1.0, 2.0, 3.0};
+    buVector3 v = {4.0, 5.0, 6.0};
+    buVector3 w = {0.0, 0.0, -1.0};
+
+    buCoordinateFrame f = buMakeVector3OrthonormalBasis(u, v, w);
+
+    // Lengths should be 1
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, buVector3Norm(f.X));
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, buVector3Norm(f.Y));
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, buVector3Norm(f.Z));
+
+    // Vectors should be orthogonal (dot product 0)
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, buVector3Dot(f.X, f.Y));
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, buVector3Dot(f.X, f.Z));
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, buVector3Dot(f.Y, f.Z));
+
+    // Z should point in same general direction as w
+    TEST_ASSERT(buVector3Dot(f.Z, w) > 0.0);
+}
+
+void test_buMakeVector3OrthonormalBasis_known_axes(void) {
+    buVector3 u = {1.0, 0.0, 0.0};
+    buVector3 v = {0.0, 1.0, 0.0};
+    buVector3 w = {0.0, 0.0, 1.0};
+
+    buCoordinateFrame f = buMakeVector3OrthonormalBasis(u, v, w);
+
+    // Expect standard basis
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, f.X.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, f.X.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, f.X.z);
+
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, f.Y.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, f.Y.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, f.Y.z);
+
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, f.Z.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, f.Z.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, f.Z.z);
+}
+
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_buVector3Norm);
+    RUN_TEST(test_buVector3SquareNorm);
+    RUN_TEST(test_buVector3Normalise);
+    RUN_TEST(test_buVector3Scalar);
+    RUN_TEST(test_buVector3Add);
+    RUN_TEST(test_buVector3Difference);
+    RUN_TEST(test_buVector3ComponentProduct);
+    RUN_TEST(test_buVector3Dot);
+    RUN_TEST(test_buVector3Cross);
+    RUN_TEST(test_buMakeVector3OrthonormalBasis_XYZ_orthonormal);
+    RUN_TEST(test_buMakeVector3OrthonormalBasis_known_axes);
+    return UNITY_END();
+}
+
+===== ./tests/test_particle.c =====
+#include "../tests/unity/src/unity.h"
+#include "../src/budgie/core.h"
+#include "../src/budgie/oop.h"
+#include "../src/budgie/cparticle.h"
+#include <math.h>
+
+#define EPSILON 1e-6
+
+void setUp(void) {}
+void tearDown(void) {}
+
+void test_integrate_basic_motion(void) {
+    Particle *p = CLASS_METHOD(&particleClass,new_instance);
+    INSTANCE_METHOD(p, set, (buVector3){0.0, 0.0, 0.0}, (buVector3){1.0, 0.0, 0.0}, (buVector3){0.0, 0.0, 0.0}, 1.0, 1.0);
+    INSTANCE_METHOD(p, integrate, 1.0);
+    buVector3 position = INSTANCE_METHOD(p, getPosition);
+    buVector3 velocity = INSTANCE_METHOD(p, getVelocity);
+
+    // Position should advance by velocity * duration
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, position.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, position.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, position.z);
+
+    // Velocity should remain unchanged
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, velocity.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, velocity.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, velocity.z);
+
+    CLASS_METHOD(&particleClass, free, p);
+}
+
+void test_integrate_with_acceleration(void) {
+    Particle *p = CLASS_METHOD(&particleClass,new_instance);
+    INSTANCE_METHOD(p, set, (buVector3){0.0, 0.0, 0.0}, (buVector3){0.0, 0.0, 0.0}, (buVector3){2.0, 0.0, 0.0}, 1.0, 1.0);
+    INSTANCE_METHOD(p, integrate, 1.0);
+    buVector3 position = INSTANCE_METHOD(p, getPosition);
+    buVector3 velocity = INSTANCE_METHOD(p, getVelocity);
+
+    // Velocity = a * t = 2.0
+    // Position = 0 + velocity * t = 0 + 0.0 * 2.0 = 0.0
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, position.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, position.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, position.z);
+
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 2.0, velocity.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, velocity.y);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 0.0, velocity.z);
+
+    CLASS_METHOD(&particleClass, free, p);
+}
+
+void test_integrate_with_damping(void) {
+    Particle *p = CLASS_METHOD(&particleClass,new_instance);
+    INSTANCE_METHOD(p, set, (buVector3){0.0, 0.0, 0.0}, (buVector3){1.0, 0.0, 0.0}, (buVector3){1.0, 0.0, 0.0}, 0.5, 1.0);
+    INSTANCE_METHOD(p, integrate, 1.0);
+    buVector3 position = INSTANCE_METHOD(p, getPosition);
+    buVector3 velocity = INSTANCE_METHOD(p, getVelocity);
+
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, position.x);
+    TEST_ASSERT_FLOAT_WITHIN(EPSILON, 1.0, velocity.x);
+
+    CLASS_METHOD(&particleClass, free, p);
+}
+
+
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_integrate_basic_motion);
+    RUN_TEST(test_integrate_with_acceleration);
+    RUN_TEST(test_integrate_with_damping);
+    return UNITY_END();
+}
+

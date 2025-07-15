@@ -1,5 +1,4 @@
 #include <assert.h>
-#include "../budgie/oop.h"
 #include "aapp.h"
 
 #include <stdbool.h>
@@ -60,7 +59,7 @@ static void initGraphics(Application *self) {
     printf("GL version: %i\n", glslVer);
 
     //SetConfigFlags(FLAG_FULLSCREEN_MODE);
-    InitWindow(1600, 1200, INSTANCE_METHOD(self, getTitle));
+    InitWindow(1600, 1200, INSTANCE_METHOD_AS(ApplicationVTable, self, getTitle));
 
     // Get the primary monitor's resolution before window creation
     int monitor = GetCurrentMonitor();
@@ -72,7 +71,7 @@ static void initGraphics(Application *self) {
 
     SetTargetFPS(60);
 
-    INSTANCE_METHOD(self, setView);
+    INSTANCE_METHOD_AS(ApplicationVTable, self, setView);
 
     // Load basic lighting shader
     shader = LoadShader("../src/demos/lighting.vs","../src/demos/lighting.fs");
@@ -109,7 +108,7 @@ static void loop(Application *self) {
         int physics_steps = 0;
         physics_duration = GetTime(); 
         while (frameTime > physics_delta) {
-            INSTANCE_METHOD(self, update, physics_delta);
+            INSTANCE_METHOD_AS(ApplicationVTable, self, update, physics_delta);
             frameTime -= physics_delta;
             physics_steps++;
             if (physics_steps > max_physics_steps) {
@@ -149,9 +148,9 @@ static void loop(Application *self) {
                 BeginShaderMode(shader);
                     DrawGrid(1000, 10.0f);
                     KeyboardKey key = GetKeyPressed();
-                    INSTANCE_METHOD(self, keyboard, key);
-                    if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) INSTANCE_METHOD(self, mouseButtonPressed, MOUSE_LEFT_BUTTON);
-                    INSTANCE_METHOD(self, display);
+                    INSTANCE_METHOD_AS(ApplicationVTable, self, keyboard, key);
+                    if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) INSTANCE_METHOD_AS(ApplicationVTable, self, mouseButtonPressed, MOUSE_LEFT_BUTTON);
+                    INSTANCE_METHOD_AS(ApplicationVTable, self, display);
                 EndShaderMode();
 
                 // Draw spheres to show where the lights are
@@ -167,7 +166,7 @@ static void loop(Application *self) {
             DrawText(TextFormat("Current Resolution: %d x %d", SCREEN_WIDTH, SCREEN_HEIGHT), 20, Y + 2*d, 30, BLUE);
             DrawText(TextFormat("Frame Time: %0.2f ms", GetFrameTime() * 1000), 20, Y + 3*d, 30, BLUE);
             DrawFPS(GetScreenWidth() - 100, 10);
-            INSTANCE_METHOD(self, display_info, Y + 4*d, d);
+            INSTANCE_METHOD_AS(ApplicationVTable, self, display_info, Y + 4*d, d);
         EndDrawing();
     }
     CloseWindow();
@@ -198,62 +197,56 @@ static void update(Application *self, buReal physics_delta) {
 
 }
 
-
-// all objects of same class have the same singlton vtable object
-static ApplicationVTable application_vtable = {
-        .getTitle = getTitle,
-        .initGraphics = initGraphics,
-        .setView = setView,
-        .init = init,
-        .deinit = deinit,
-        .loop = loop,
-        .display = display,
-        .display_info = display_info,
-        .keyboard = keyboard,
-        .mouseButtonPressed = mouseButtonPressed,
-        .update = update
-};
-
 // new object
-static Application *new_instance(const ApplicationClass *cls) {
+static Object *new_instance(const Class *cls) {
     printf("new_instance: enter %p\n", cls);
     Application *app= malloc(sizeof(Application));
     assert(app);
-    app->klass = cls;
+    ((Object *)app)->klass = cls;
     printf("new_instance: leave\n");
-    return app;
+    return (Object *)app;
 }
 
 // free object
-void application_free_instance(ApplicationClass *cls, Application *self) {
+void application_free_instance(const Class *cls, Object *self) {
     free(self);
 }
 
-const ApplicationClass *create_child_class(const ApplicationClass *cls, const char *name) {
-    ApplicationClass *child = malloc(sizeof(ApplicationClass));
-    ApplicationVTable *vtable = malloc(sizeof(ApplicationVTable));
-    *vtable = application_vtable;
-    child->vtable = vtable;
-    size_t length = strlen(name);
-    child->class_name = malloc((length+1)*sizeof(char));
-    assert(child->class_name);
-    strcpy(child->class_name, name);
-    child->parent = cls;
-    child->new_instance = new_instance;
-    child->free = application_free_instance;
-    child->create_child_class = create_child_class;
-    printf("create_child_class: cls: %p\n", cls);
-    printf("create_child_class: child: %p\n", child);
-    return child;
+// new object
+static Object *application_new_instance(const Class *cls) {
+    Application *p = malloc(sizeof(Application));
+    ((Object *)p)->klass = cls;
+    return (Object *)p;
 }
 
+ApplicationClass applicationClass;
+ApplicationVTable application_vtable;
 
-ApplicationClass applicationClass = {
-    .class_name = "Application",
-    .vtable = &application_vtable,
-    .new_instance = new_instance,
-    .free = application_free_instance,
-    .create_child_class = create_child_class,
-    .parent = NULL
-};
+static bool application_initialized = false;
+void ApplicationCreateClass() {
+    if (!application_initialized) {
+        application_vtable.base = vTable;
 
+        // application methods
+        application_vtable.setView = setView;
+        application_vtable.getTitle = getTitle;
+        application_vtable.initGraphics = initGraphics;
+        application_vtable.init = init;
+        application_vtable.deinit = deinit;
+        application_vtable.loop = loop;
+        application_vtable.display = display;
+        application_vtable.display_info = display_info;
+        application_vtable.keyboard = keyboard;
+        application_vtable.mouseButtonPressed = mouseButtonPressed;
+        application_vtable.update = update;
+
+        // init the application class
+        applicationClass.base = class;
+        applicationClass.base.vtable = (VTable *)&application_vtable;
+        applicationClass.base.class_name = strdup("Application");
+        applicationClass.base.new_instance = application_new_instance;
+        applicationClass.base.free = application_free_instance;
+
+        application_initialized = true;
+    }
+}

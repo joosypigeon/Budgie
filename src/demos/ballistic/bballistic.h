@@ -3,9 +3,25 @@
 
 #include "../aapp.h"
 
+typedef struct Ballistic Ballistic;
+typedef struct BallisticClass BallisticClass;
+typedef struct BallisticVTable BallisticVTable;
 
+struct BallisticVTable {
+    ApplicationVTable base; // Application base VTable
+};
 
-Application *getApplication();
+struct Ballistic {
+    Application base;
+};
+
+struct BallisticClass {
+    ApplicationClass base;
+};
+
+Object *getApplication();
+
+extern void BallisticCreateClass();
 
 
 #endif //BBALLISTIC_H

@@ -1,6 +1,8 @@
 #ifndef AAPP_H
 #define AAPP_H
 
+#include "../budgie/oop.h"
+
 #include "../budgie/precision.h"
 #include <stddef.h>
 #include "raylib.h"
@@ -10,10 +12,13 @@ typedef struct ApplicationClass ApplicationClass;
 typedef struct ApplicationVTable ApplicationVTable;
 
 struct ApplicationVTable {
-    const char* (*getTitle)(Application *self);
-    void (*init)(Application *self);
-    void (*initGraphics)(Application *self);
+    VTable base; // base VTable for all classes
+
+    // application methods
     void (*setView)(Application *self);
+    const char *(*getTitle)(Application *self);
+    void (*initGraphics)(Application *self);
+    void (*init)(Application *self);
     void (*deinit)(Application *self);
     void (*loop)(Application *self);
     void (*display)(Application *self);
@@ -24,7 +29,7 @@ struct ApplicationVTable {
 };
 
 struct Application {
-    const ApplicationClass *klass;
+    Object base;
 
     // private
     size_t _height;
@@ -32,16 +37,12 @@ struct Application {
 };
 
 struct ApplicationClass {
-    char *class_name;
-    ApplicationVTable *vtable;
-    Application *(*new_instance)(const ApplicationClass *cls);
-    void (*free)(ApplicationClass *cls,Application *self);
-    const ApplicationClass *(*create_child_class)(const ApplicationClass *cls, const char *name);
-    const ApplicationClass *parent;
+    Class base;
 };
 
+extern ApplicationVTable application_vtable; 
 extern ApplicationClass applicationClass; // singleton object is the class
-//extern const ApplicationClass *ballisticClass;
 
-extern Application *getApplication();
+extern void ApplicationCreateClass();
+extern Object *getApplication();
 #endif // AAPP_H

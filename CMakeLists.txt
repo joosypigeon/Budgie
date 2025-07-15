@@ -33,6 +33,7 @@ set(DEMO_DIR ${SRC_DIR}/demos)
 set(SOURCES
     ${SRC_DIR}/main.c
     ${SRC_DIR}/core.c
+    ${SRC_DIR}/oop.c
     ${SRC_DIR}/cparticle.c
 )
 add_executable(budgie ${SOURCES})
@@ -55,6 +56,7 @@ add_executable(run_tests_particle
     ${TEST_DIR}/unity/src/unity.c
     ${SRC_DIR}/core.c
     ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/oop.c
 )
 target_include_directories(run_tests_particle PRIVATE ${SRC_DIR} ${TEST_DIR}/unity/src)
 target_link_libraries(run_tests_particle m)
@@ -79,6 +81,7 @@ set(CORE_SOURCES
     ${SRC_DIR}/core.c
     ${SRC_DIR}/cparticle.c
     ${SRC_DIR}/random.c
+    ${SRC_DIR}/oop.c
 )
 
 add_executable(demo_ballistic ${BALLISTIC_DEMO_SOURCES} ${CORE_SOURCES})
@@ -94,10 +97,6 @@ if(OpenMP_C_FOUND)
 else()
     message(WARNING "OpenMP not found; demo_ballistic may fail if OpenMP is used")
 endif()
-
-
-
-
 
 
 
@@ -118,6 +117,7 @@ set(CORE_SOURCES
     ${SRC_DIR}/core.c
     ${SRC_DIR}/cparticle.c
     ${SRC_DIR}/random.c
+    ${SRC_DIR}/oop.c
 )
 
 add_executable(demo_fireworks ${FIREWORKS_DEMO_SOURCES} ${CORE_SOURCES})

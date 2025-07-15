@@ -107,6 +107,9 @@ static void addForce(Particle *particle, const buVector3 force) {
 
 // all objects of same class have the same singlton vtable object
 static ParticleVTable particle_vtable = {
+        .base = {0}, // base VTable initialized to NULLs
+
+        // application methods
         .integrate = integrate,
         .set = set,
         .setMass = setMass,
@@ -126,21 +129,31 @@ static ParticleVTable particle_vtable = {
         .addForce = addForce
 };
 
+ __attribute__((constructor))
+void particle_init() {
+    // Complite Initialize the vtable for the Particle class
+    particle_vtable.base = vTable;
+}
+
+
 // new object
-static Particle *particle_new_instance(ParticleClass *cls) {
+static Object *particle_new_instance(const Class *cls) {
     Particle *p = malloc(sizeof(Particle));
-    p->klass = cls;
-    return p;
+    ((Object *)p)->klass = cls;
+    return (Object *)p;
 }
 
 // free object
-void particle_free_instance(ParticleClass *cls, Particle *self) {
+void particle_free_instance(const Class *cls, Object *self) {
     free(self);
 }
 
 ParticleClass particleClass = {
-    .class_name = "Particle",
-    .vtable = &particle_vtable,
-    .new_instance = particle_new_instance,
-    .free = particle_free_instance
+    .base = {
+        .class_name = "Particle",
+        .vtable = (VTable *)&particle_vtable,
+        .parent = &class,
+        .new_instance = particle_new_instance,
+        .free = particle_free_instance,
+    }
 };

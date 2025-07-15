@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "../../budgie/random.h"
 #include <limits.h>
+#include <string.h>
 #include "raylib.h"
 
 #define MAX_FIREWORKS 10240 /** Holds the maximum number of fireworks that can be in use. */
@@ -60,11 +61,11 @@ bool updateFirework(Firework *firework, buReal duration) {
     //updateTiming();
 
     // Update our physical state
-    INSTANCE_METHOD(firework->particle, integrate, duration);
+    INSTANCE_METHOD_AS(ParticleVTable, firework->particle, integrate, duration);
 
     // We work backwards from our age to zero.
     firework->age -= duration;
-    return (firework->age < 0) || (INSTANCE_METHOD(firework->particle, getPosition).y < 0 );
+    return (firework->age < 0) || (INSTANCE_METHOD_AS(ParticleVTable, firework->particle, getPosition).y < 0 );
 }
 
 
@@ -96,22 +97,22 @@ void createFireworkFromRule(const FireworkRule *fireworkRule, Firework *child, c
     buVector3 velocity = (buVector3){0};
     if (parent) {
         // The position and velocity are based on the parent.
-        buVector3 position = INSTANCE_METHOD(parent->particle, getPosition);
-        INSTANCE_METHOD(child->particle, setPosition, position);
-        velocity = INSTANCE_METHOD(parent->particle, getVelocity);
+        buVector3 position = INSTANCE_METHOD_AS(ParticleVTable, parent->particle, getPosition);
+        INSTANCE_METHOD_AS(ParticleVTable, child->particle, setPosition, position);
+        velocity = INSTANCE_METHOD_AS(ParticleVTable, parent->particle, getVelocity);
     } else {
         buVector3 start = (buVector3){
             (buReal)(5 * (buRandomInt(3) - 1)),
             (buReal)0.0,
             (buReal)0.0
         };
-        INSTANCE_METHOD(child->particle, setPosition, start);
+        INSTANCE_METHOD_AS(ParticleVTable, child->particle, setPosition, start);
     }
-    INSTANCE_METHOD(child->particle, setVelocity, buVector3Add(velocity, buRandomVectorByRange(&fireworkRule->minVelocity, &fireworkRule->maxVelocity)));
-    INSTANCE_METHOD(child->particle, setInverseMass, 1.0);
-    INSTANCE_METHOD(child->particle, setDamping, fireworkRule->damping);
-    INSTANCE_METHOD(child->particle, setAcceleration, GRAVITY);
-    INSTANCE_METHOD(child->particle, clearAccumulator);
+    INSTANCE_METHOD_AS(ParticleVTable, child->particle, setVelocity, buVector3Add(velocity, buRandomVectorByRange(&fireworkRule->minVelocity, &fireworkRule->maxVelocity)));
+    INSTANCE_METHOD_AS(ParticleVTable, child->particle, setInverseMass, 1.0);
+    INSTANCE_METHOD_AS(ParticleVTable, child->particle, setDamping, fireworkRule->damping);
+    INSTANCE_METHOD_AS(ParticleVTable, child->particle, setAcceleration, GRAVITY);
+    INSTANCE_METHOD_AS(ParticleVTable, child->particle, clearAccumulator);
 }
 
 void initFireworkRules() {
@@ -238,7 +239,7 @@ void init(Application *self) {
     for (Firework *firework = fireworks;
          firework < fireworks+MAX_FIREWORKS;
          firework++) {
-        firework->particle = CLASS_METHOD(&particleClass, new_instance);
+        firework->particle = (Particle *)CLASS_METHOD(&particleClass, new_instance);
         firework->type = 0;
         firework->spawn = false;
     }
@@ -249,7 +250,7 @@ void init(Application *self) {
     nextFirework = 0;
 }
 
-void deinitDemo(unsigned count) {
+void deinitDemo(Application *self) {
     
 }
 
@@ -341,7 +342,7 @@ void display(Application *self) {
                 case 9: color = (Color){255,128,128,255}; break;
             };
 
-            buVector3 position = INSTANCE_METHOD(firework->particle, getPosition);
+            buVector3 position = INSTANCE_METHOD_AS(ParticleVTable, firework->particle, getPosition);
             DrawCube((Vector3){position.x, position.y, position.z}, size, size, size, color);
             DrawCube((Vector3){position.x, -position.y, position.z}, size, size, size, color);// Render the firework's reflection
         }
@@ -369,25 +370,35 @@ void display_info(Application *self, size_t Y, size_t d){
     DrawText(TextFormat("live fireworks: %d", liveFireworks), 20, Y, 30, BLUE);
 }
 
-static const ApplicationClass *fireworksDemoClass;
+FireworksClass fireworksClass;
+FireworksVTable fireworks_vtable;
 
-__attribute__((constructor))
-void init_before_main() {
-    printf("init_before_main: enter\n");
-    fireworksDemoClass = CLASS_METHOD(&applicationClass, create_child_class, "Fireworks Demo");
-    fireworksDemoClass->vtable->getTitle = getTitle;
-    //ballisticClass->vtable->initGraphics = initGraphics;
-    fireworksDemoClass->vtable->init = init;
-    //ballisticClass->vtable->setView = setView;
-    //ballisticClass->vtable->deinit = deinit;
-    //ballisticClass->vtable->loop = loop;
-    fireworksDemoClass->vtable->display = display;
-    fireworksDemoClass->vtable->display_info = display_info;
-    fireworksDemoClass->vtable->keyboard = keyboard;
-    fireworksDemoClass->vtable->update = update;
-    printf("init_before_main: leave\n");
+static bool fireworks_initialized = false;
+void FireworksCreateClass() {
+    if (!fireworks_initialized) {
+        ApplicationCreateClass();
+        fireworks_vtable.base = application_vtable;
+
+        // override application methods
+        fireworks_vtable.base.init = init;
+        fireworks_vtable.base.deinit = deinitDemo;
+        fireworks_vtable.base.getTitle = getTitle;
+        fireworks_vtable.base.update = update;
+        fireworks_vtable.base.display = display;
+        fireworks_vtable.base.display_info = display_info;
+        fireworks_vtable.base.keyboard = keyboard;
+
+        // init the fireworks class
+        fireworksClass.base = applicationClass;
+        fireworksClass.base.base.vtable = (VTable *)&fireworks_vtable;
+        fireworksClass.base.base.class_name = strdup("Fireworks");
+
+        fireworks_initialized = true;
+    }
 }
 
-Application *getApplication() {
-    return CLASS_METHOD(fireworksDemoClass, new_instance);
+Object *getApplication() {
+    FireworksCreateClass();
+    printf("getApplication: %s\n", fireworksClass.base.base.class_name);
+    return CLASS_METHOD(&fireworksClass, new_instance);
 }

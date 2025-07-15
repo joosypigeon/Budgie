@@ -3,6 +3,10 @@
 #include "../../budgie/cparticle.h"
 #include "../timing.h"
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 
 #define AMMO_ROUNDS 16
 
@@ -25,7 +29,7 @@ typedef struct {
 
 /** Draws the round. */
 void render(AmmoRound *ammoRound) {
-    buVector3 position = INSTANCE_METHOD(ammoRound->particle, getPosition);
+    buVector3 position = INSTANCE_METHOD_AS(ParticleVTable, ammoRound->particle, getPosition);
     ShotType type = ammoRound->type;
     buReal radius = -1.0;
     Color color = BLACK;
@@ -72,7 +76,7 @@ void init(Application *self) {
     // Make all shots unused
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
         shot->type = UNUSED;
-        shot->particle = CLASS_METHOD(&particleClass,new_instance);
+        shot->particle = (Particle *)CLASS_METHOD(&particleClass,new_instance);
     }
 }
 
@@ -81,7 +85,7 @@ void deinitDemo() {
 }
 
 const char* getTitle(Application *self) {
-    return self->klass->class_name;
+    return ((Object *)self)->klass->class_name;
 }
 
 void fire() {
@@ -95,26 +99,26 @@ void fire() {
     // Set the properties of the particle
     switch(currentShotType) {
         case PISTOL:
-            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 35.0f}, (buVector3){0.0f, -1.0f, 0.0f}, 0.9, 1.0/2.0);
+            INSTANCE_METHOD_AS(ParticleVTable, shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 35.0f}, (buVector3){0.0f, -1.0f, 0.0f}, 0.9, 1.0/2.0);
             break;
 
         case ARTILLERY:
-            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 30.0f, 40.0f}, (buVector3){0.0f, -20.0f, 0.0f}, 0.99, 1.0/200.0);
+            INSTANCE_METHOD_AS(ParticleVTable, shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 30.0f, 40.0f}, (buVector3){0.0f, -20.0f, 0.0f}, 0.99, 1.0/200.0);
             break;
 
         case FIREBALL:
-            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 10.0f}, (buVector3){0.0f, 0.6f, 0.0f}, 0.9, 1.0/1.0);
+            INSTANCE_METHOD_AS(ParticleVTable, shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 10.0f}, (buVector3){0.0f, 0.6f, 0.0f}, 0.9, 1.0/1.0);
             break;
 
         case LASER:
-            INSTANCE_METHOD(shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 100.0f}, (buVector3){0.0f, 0.0f, 0.0f}, 0.99, 1.0/0.1);
+            INSTANCE_METHOD_AS(ParticleVTable, shot->particle, set, (buVector3){0.0f, 1.5f, 0.0f}, (buVector3){0.0f, 0.0f, 100.0f}, (buVector3){0.0f, 0.0f, 0.0f}, 0.99, 1.0/0.1);
             break;
     }
     // Set the data common to all particle types
     shot->startTime = getTiming()->lastFrameTimestamp;
     shot->type = currentShotType;
     // Clear the force accumulators
-    INSTANCE_METHOD(shot->particle, clearAccumulator);
+    INSTANCE_METHOD_AS(ParticleVTable, shot->particle, clearAccumulator);
     //clearAccumulator(&shot->particle);
 }
 
@@ -129,10 +133,10 @@ void update(Application *self, buReal duration) {
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
         if (shot->type != UNUSED) {
             // Run the physics
-            INSTANCE_METHOD(shot->particle, integrate, duration);
+            INSTANCE_METHOD_AS(ParticleVTable, shot->particle, integrate, duration);
 
             // Check if the particle is now invalid
-            buVector3 position = INSTANCE_METHOD(shot->particle, getPosition);
+            buVector3 position = INSTANCE_METHOD_AS(ParticleVTable, shot->particle, getPosition);
             if (position.y < 0.0f ||
                 shot->startTime+5000 < getTiming()->lastFrameTimestamp ||
                 position.z > 200.0f) {
@@ -186,27 +190,53 @@ void mouseButtonPressed(Application *self, MouseButton mouseButton) {
     if(mouseButton==MOUSE_BUTTON_LEFT) fire();
 }
 
+BallisticVTable ballistic_vtable = {
+    .base = {0}, // base VTable initialized to NULLs
+};
 
-static const ApplicationClass *ballisticClass;
-
-__attribute__((constructor))
-void init_before_main() {
-    printf("init_before_main: enter\n");
-    ballisticClass = CLASS_METHOD(&applicationClass, create_child_class, "Ballistic");
-    ballisticClass->vtable->getTitle = getTitle;
-    //ballisticClass->vtable->initGraphics = initGraphics;
-    ballisticClass->vtable->init = init;
-    //ballisticClass->vtable->setView = setView;
-    //ballisticClass->vtable->deinit = deinit;
-    //ballisticClass->vtable->loop = loop;
-    ballisticClass->vtable->display = display;
-    ballisticClass->vtable->display_info = display_info;
-    ballisticClass->vtable->keyboard = keyboard;
-    ballisticClass->vtable->mouseButtonPressed = mouseButtonPressed;
-    ballisticClass->vtable->update = update;
-    printf("init_before_main: leave\n");
+static Object *ballistic_new_instance(const Class *cls) {
+    Ballistic *p = malloc(sizeof(Ballistic));
+    ((Object *)p)->klass = cls;
+    return (Object *)p;
 }
 
-Application *getApplication() {
-    return CLASS_METHOD(ballisticClass, new_instance);
+void ballistic_free_instance(const Class *cls, Object *self) {
+    free(self);
+}
+
+
+BallisticClass ballisticClass;
+BallisticVTable ballistic_vtable;
+
+static bool ballistic_initialized = false;
+void BallisticCreateClass() {
+    if (!ballistic_initialized) {
+        ApplicationCreateClass();
+        ballistic_vtable.base = application_vtable;
+
+        // override application methods
+        ballistic_vtable.base.init = init;
+        ballistic_vtable.base.deinit = deinitDemo;
+        ballistic_vtable.base.getTitle = getTitle;
+        ballistic_vtable.base.update = update;
+        ballistic_vtable.base.display = display;
+        ballistic_vtable.base.display_info = display_info;
+        ballistic_vtable.base.keyboard = keyboard;
+        ballistic_vtable.base.mouseButtonPressed = mouseButtonPressed;
+
+        // init the ballistic class
+        ballisticClass.base = applicationClass;
+        ballisticClass.base.base.vtable = (VTable *)&ballistic_vtable;
+        ballisticClass.base.base.class_name = strdup("Ballistic");
+        ballisticClass.base.base.new_instance = ballistic_new_instance;
+        ballisticClass.base.base.free = ballistic_free_instance;
+
+        ballistic_initialized = true;
+    }
+}
+
+Object *getApplication() {
+    BallisticCreateClass();
+    printf("getApplication: %s\n", ballisticClass.base.base.class_name);
+    return CLASS_METHOD(&ballisticClass, new_instance);
 }
