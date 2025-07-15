@@ -62,10 +62,70 @@ void test_pop(void) {
     CLASS_METHOD(&vectorClass, free, (Object *)v);
 }
 
+void test_general_operations(void) {
+    Vector *v = (Vector *)CLASS_METHOD(&vectorClass, new_instance);
+
+    // Push some string literals
+    INSTANCE_METHOD_AS(VectorVTable, v, push, "Apple");
+    INSTANCE_METHOD_AS(VectorVTable, v, push, "Banna");
+    INSTANCE_METHOD_AS(VectorVTable, v, push, "Cherry");
+
+    TEST_ASSERT_EQUAL_STRING("Apple", (char *)INSTANCE_METHOD_AS(VectorVTable, v, get, 0));
+    TEST_ASSERT_EQUAL_STRING("Banna", (char *)INSTANCE_METHOD_AS(VectorVTable, v, get, 1));
+    TEST_ASSERT_EQUAL_STRING("Cherry", (char *)INSTANCE_METHOD_AS(VectorVTable, v, get, 2));
+
+    TEST_ASSERT_EQUAL_UINT32(3, INSTANCE_METHOD_AS(VectorVTable, v, getLength));
+
+    INSTANCE_METHOD_AS(VectorVTable, v, set, 1, "Blueberry");
+
+    TEST_ASSERT_EQUAL_STRING("Blueberry", (char *)INSTANCE_METHOD_AS(VectorVTable, v, get, 1));
+
+    // Clean up
+    CLASS_METHOD(&vectorClass, free, (Object *)v);
+}
+
+void test_large_vector(void) {
+    const size_t N = 10000;
+    Vector *v = (Vector *)CLASS_METHOD(&vectorClass, new_instance);
+
+    // Allocate and store N integers
+    int *data = malloc(N * sizeof(int));
+    for (size_t i = 0; i < N; ++i) {
+        data[i] = (int)i;
+        INSTANCE_METHOD_AS(VectorVTable, v, push, &data[i]);
+    }
+
+    // Check the length is as expected
+    TEST_ASSERT_EQUAL_UINT32(N, INSTANCE_METHOD_AS(VectorVTable, v, getLength));
+
+    // Spot-check some values
+    TEST_ASSERT_EQUAL_INT(0, *(int *)INSTANCE_METHOD_AS(VectorVTable, v, get, 0));
+    TEST_ASSERT_EQUAL_INT(1234, *(int *)INSTANCE_METHOD_AS(VectorVTable, v, get, 1234));
+    TEST_ASSERT_EQUAL_INT(9999, *(int *)INSTANCE_METHOD_AS(VectorVTable, v, get, 9999));
+
+    // Set a new value in the middle
+    int sentinel = -12345;
+    INSTANCE_METHOD_AS(VectorVTable, v, set, 5000, &sentinel);
+    TEST_ASSERT_EQUAL_PTR(&sentinel, INSTANCE_METHOD_AS(VectorVTable, v, get, 5000));
+
+    // Pop all items (ensuring nothing crashes)
+    for (size_t i = 0; i < N; ++i) {
+        INSTANCE_METHOD_AS(VectorVTable, v, pop);
+    }
+    TEST_ASSERT_EQUAL_UINT32(0, INSTANCE_METHOD_AS(VectorVTable, v, getLength));
+
+    // Clean up
+    CLASS_METHOD(&vectorClass, free, (Object *)v);
+    free(data);
+}
+    
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_push_and_getLength);
     RUN_TEST(test_get_and_set);
     RUN_TEST(test_pop);
+    RUN_TEST(test_general_operations);
+    RUN_TEST(test_large_vector);
     return UNITY_END();
 }
