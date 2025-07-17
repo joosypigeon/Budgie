@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include "budgie/cparticle.h"
 
 // Method definitions
@@ -62,7 +63,7 @@ static buReal getInverseMass(Particle *particle) {
 }
 
 static bool hasFiniteMass(Particle *particle) {
-    return particle->_inverseMass >= 0.0f;
+    return particle->_inverseMass > 0.0f;
 }
 
 static void setDamping(Particle *particle, const buReal damping) {
@@ -105,55 +106,61 @@ static void addForce(Particle *particle, const buVector3 force) {
     particle->_forceAccum = buVector3Add(particle->_forceAccum, force);
 }
 
-// all objects of same class have the same singlton vtable object
-static ParticleVTable particle_vtable = {
-        .base = {0}, // base VTable initialized to NULLs
-
-        // application methods
-        .integrate = integrate,
-        .set = set,
-        .setMass = setMass,
-        .getMass = getMass,
-        .setInverseMass = setInverseMass,
-        .getInverseMass = getInverseMass,
-        .hasFiniteMass = hasFiniteMass,
-        .setDamping = setDamping,
-        .getDamping = getDamping,
-        .setPosition = setPosition,
-        .getPosition = getPosition,
-        .setVelocity = setVelocity,
-        .getVelocity = getVelocity,
-        .setAcceleration = setAcceleration,
-        .getAcceleration = getAcceleration,
-        .clearAccumulator = clearAccumulator,
-        .addForce = addForce
-};
-
- __attribute__((constructor))
-void particle_init() {
-    // Complite Initialize the vtable for the Particle class
-    particle_vtable.base = vTable;
-}
-
-
-// new object
-static Object *particle_new_instance(const Class *cls) {
-    Particle *p = malloc(sizeof(Particle));
-    ((Object *)p)->klass = cls;
-    return (Object *)p;
-}
+ParticleClass particleClass;
+ParticleVTable particle_vtable;
 
 // free object
 void particle_free_instance(const Class *cls, Object *self) {
     free(self);
 }
 
-ParticleClass particleClass = {
-    .base = {
-        .class_name = "Particle",
-        .vtable = (VTable *)&particle_vtable,
-        .parent = &class,
-        .new_instance = particle_new_instance,
-        .free = particle_free_instance,
+// new object
+static Object *particle_new_instance(const Class *cls) {
+    Particle *p = malloc(sizeof(Particle));
+    assert(p);  // Check for allocation failure
+    ((Object *)p)->klass = cls;
+    return (Object *)p;
+}
+
+static const char *get_name(ParticleClass *cls) {
+    return cls->class_name;
+}
+
+static bool particle_initialized = false;
+void ParticleCreateClass() {
+    printf("ParticleCreateClass:enter\n");
+    if (!particle_initialized) {
+        printf("ParticleCreateClass:initializing\n");
+        particle_vtable.base = vTable; // inherit from VTable
+
+        // methods
+        particle_vtable.integrate = integrate,
+        particle_vtable.set = set,
+        particle_vtable.setMass = setMass,
+        particle_vtable.getMass = getMass,
+        particle_vtable.setInverseMass = setInverseMass,
+        particle_vtable.getInverseMass = getInverseMass,
+        particle_vtable.hasFiniteMass = hasFiniteMass,
+        particle_vtable.setDamping = setDamping,
+        particle_vtable.getDamping = getDamping,
+        particle_vtable.setPosition = setPosition,
+        particle_vtable.getPosition = getPosition,
+        particle_vtable.setVelocity = setVelocity,
+        particle_vtable.getVelocity = getVelocity,
+        particle_vtable.setAcceleration = setAcceleration,
+        particle_vtable.getAcceleration = getAcceleration,
+        particle_vtable.clearAccumulator = clearAccumulator,
+        particle_vtable.addForce = addForce,
+
+        // init the particle class
+        particleClass.base = class; // inherit from Class
+        particleClass.base.vtable = (VTable *)&particle_vtable;
+        particleClass.base.new_instance = particle_new_instance;
+        particleClass.base.free = particle_free_instance;
+        particleClass.class_name = strdup("Particle");
+        particleClass.get_name = get_name;
+
+        particle_initialized = true;
     }
-};
+    printf("ParticleCreateClass:leave\n");
+}

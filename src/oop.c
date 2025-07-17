@@ -23,14 +23,14 @@ static const Class *get_parent(Object *self) {
 }
 
 // all objects of same class have the same singlton vtable object
-const VTable vTable = {
+VTable vTable = {
         .get_name = get_name,
         .to_string = to_string,
         .get_parent = get_parent
 };
 
 // instantiate object from class 
-static Object *new_instance(const Class *cls) {
+Object *object_new_instance(const Class *cls) {
     printf("new_instance: enter %p\n", cls);
     Object *object= malloc(sizeof(Object));
     assert(object);
@@ -40,7 +40,7 @@ static Object *new_instance(const Class *cls) {
 }
 
 // free object
-void free_instance(const Class *cls, Object *self) {
+void object_free_instance(const Class *cls, Object *self) {
     free(self);
 }
 
@@ -48,6 +48,6 @@ Class class = {
     .class_name = "root",
     .vtable = &vTable,
     .parent = NULL,
-    .new_instance = new_instance,
-    .free = free_instance,
+    .new_instance = object_new_instance,
+    .free = object_free_instance,
 };

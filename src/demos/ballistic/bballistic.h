@@ -17,6 +17,9 @@ struct Ballistic {
 
 struct BallisticClass {
     ApplicationClass base;
+
+    const char *class_name; // class name
+    const char *(*get_name)(BallisticClass *cls);
 };
 
 Object *getApplication();

@@ -19,6 +19,9 @@ struct Fireworks {
 
 struct FireworksClass {
     ApplicationClass base;
+
+    const char *class_name; // class name
+    const char *(*get_name)(FireworksClass *cls);
 };
 
 Object *getApplication();

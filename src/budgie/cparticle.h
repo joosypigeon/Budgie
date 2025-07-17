@@ -49,7 +49,12 @@ typedef struct Particle {
 
 typedef struct ParticleClass {
     Class base; // inherit from Class
+    
+    const char *class_name; // class name
+    const char *(*get_name)(ParticleClass *cls);
 } ParticleClass;
 
 extern ParticleClass particleClass; // singleton object is the class
+
+extern void ParticleCreateClass();
 #endif // CPARTICLE_H

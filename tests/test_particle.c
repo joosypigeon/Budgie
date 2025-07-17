@@ -10,7 +10,10 @@ void setUp(void) {}
 void tearDown(void) {}
 
 void test_integrate_basic_motion(void) {
+    printf("test_integrate_basic_motion:enter\n");
+    printf("particleClass:%p\n", &particleClass);
     Particle *p = (Particle *)CLASS_METHOD(&particleClass,new_instance);
+    printf("p:%p\n", p);
     INSTANCE_METHOD_AS(ParticleVTable, p, set, (buVector3){0.0, 0.0, 0.0}, (buVector3){1.0, 0.0, 0.0}, (buVector3){0.0, 0.0, 0.0}, 1.0, 1.0);
     INSTANCE_METHOD_AS(ParticleVTable, p, integrate, 1.0);
     buVector3 position = INSTANCE_METHOD_AS(ParticleVTable, p, getPosition);
@@ -65,6 +68,7 @@ void test_integrate_with_damping(void) {
 
 
 int main(void) {
+    ParticleCreateClass();
     UNITY_BEGIN();
     RUN_TEST(test_integrate_basic_motion);
     RUN_TEST(test_integrate_with_acceleration);

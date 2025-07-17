@@ -38,10 +38,13 @@ struct Application {
 
 struct ApplicationClass {
     Class base;
+
+    const char *class_name; // class name
+    const char *(*get_name)(ApplicationClass *cls);
 };
 
-extern ApplicationVTable application_vtable; 
 extern ApplicationClass applicationClass; // singleton object is the class
+extern ApplicationVTable application_vtable; // singleton object is the vtable
 
 extern void ApplicationCreateClass();
 extern Object *getApplication();

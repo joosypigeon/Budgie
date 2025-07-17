@@ -29,15 +29,18 @@ struct Object {
 
 struct Class {
     char *class_name;
-    const VTable *vtable;
+    VTable *vtable;
     const Class *parent;
     Object *(*new_instance)(const Class *cls);
     void (*free)(const Class *cls,Object *self);
 };
 
-extern const VTable vTable;
+extern VTable vTable;
 extern Class class; // singleton object is the class
 
 void RootCreateClass(); // Create the root class
+
+extern Object *object_new_instance(const Class *cls);
+extern void object_free_instance(const Class *cls, Object *self);
 
 #endif // OOP_H

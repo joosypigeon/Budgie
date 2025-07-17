@@ -235,6 +235,7 @@ void initFireworkRules() {
 }
 
 void init(Application *self) {
+    printf("fireworks::init:enter\n");
     // Make all shots unused
     for (Firework *firework = fireworks;
          firework < fireworks+MAX_FIREWORKS;
@@ -248,6 +249,7 @@ void init(Application *self) {
     initFireworkRules();
 
     nextFirework = 0;
+    printf("fireworks::init:leave\n");
 }
 
 void deinitDemo(Application *self) {
@@ -370,13 +372,30 @@ void display_info(Application *self, size_t Y, size_t d){
     DrawText(TextFormat("live fireworks: %d", liveFireworks), 20, Y, 30, BLUE);
 }
 
+static Object *fireworks_new_instance(const Class *cls) {
+    Fireworks *p = malloc(sizeof(Fireworks));
+    ((Object *)p)->klass = cls;
+    return (Object *)p;
+}
+
+void fireworks_free_instance(const Class *cls, Object *self) {
+    free(self);
+}
+
+static const char *get_name(FireworksClass *cls) {
+    return cls->class_name;
+}
+
 FireworksClass fireworksClass;
 FireworksVTable fireworks_vtable;
 
 static bool fireworks_initialized = false;
 void FireworksCreateClass() {
+    printf("FireworksCreateClass:enter\n");
     if (!fireworks_initialized) {
+        printf("FireworksCreateClass: initializing\n");
         ApplicationCreateClass();
+        ParticleCreateClass();
         fireworks_vtable.base = application_vtable;
 
         // override application methods
@@ -391,10 +410,14 @@ void FireworksCreateClass() {
         // init the fireworks class
         fireworksClass.base = applicationClass;
         fireworksClass.base.base.vtable = (VTable *)&fireworks_vtable;
-        fireworksClass.base.base.class_name = strdup("Fireworks");
+        fireworksClass.class_name = strdup("Fireworks");
+        fireworksClass.get_name = get_name;
+        fireworksClass.base.base.new_instance = fireworks_new_instance;
+        fireworksClass.base.base.free = fireworks_free_instance;
 
         fireworks_initialized = true;
     }
+    printf("FireworksCreateClass:leave\n");
 }
 
 Object *getApplication() {

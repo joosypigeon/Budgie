@@ -15,6 +15,8 @@ struct VectorVTable {
     void *(*pop)(Vector *Vector);
     void *(*get)(Vector *Vector, size_t i);
     void (*set)(Vector *Vector, size_t i, void *item);
+    void (*remove)(Vector *Vector, void *item);
+    void (*clear)(Vector *Vector);
     size_t (*getLength)(Vector *Vector);
 };
 

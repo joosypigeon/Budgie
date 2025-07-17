@@ -72,12 +72,15 @@ ShotType currentShotType;
 
 // Method definitions
 void init(Application *self) {
+    printf("ballistic::init:enter\n");
     initTiming();
+    printf("Hello A\n");
     // Make all shots unused
     for (AmmoRound *shot = ammo; shot < ammo+ammoRounds; shot++) {
         shot->type = UNUSED;
         shot->particle = (Particle *)CLASS_METHOD(&particleClass,new_instance);
     }
+    printf("ballistic::init:leave\n");
 }
 
 void deinitDemo() {
@@ -204,14 +207,21 @@ void ballistic_free_instance(const Class *cls, Object *self) {
     free(self);
 }
 
+static const char *get_name(BallisticClass *cls) {
+    return cls->class_name;
+}
+
 
 BallisticClass ballisticClass;
 BallisticVTable ballistic_vtable;
 
 static bool ballistic_initialized = false;
 void BallisticCreateClass() {
+    printf("BallisticCreateClass:enter\n");
     if (!ballistic_initialized) {
+        printf("BallisticCreateClass:initializing\n");
         ApplicationCreateClass();
+        ParticleCreateClass();
         ballistic_vtable.base = application_vtable;
 
         // override application methods
@@ -227,12 +237,13 @@ void BallisticCreateClass() {
         // init the ballistic class
         ballisticClass.base = applicationClass;
         ballisticClass.base.base.vtable = (VTable *)&ballistic_vtable;
-        ballisticClass.base.base.class_name = strdup("Ballistic");
+        ballisticClass.class_name = strdup("Ballistic");
         ballisticClass.base.base.new_instance = ballistic_new_instance;
         ballisticClass.base.base.free = ballistic_free_instance;
 
         ballistic_initialized = true;
     }
+    printf("BallisticCreateClass:leave\n");
 }
 
 Object *getApplication() {

@@ -47,6 +47,8 @@ static const char *getTitle(Application *self) {
 }
 
 static void init(Application *self) {
+    printf("init:enter\n");
+    printf("init:leave\n");
 }
 
 static void initGraphics(Application *self) {
@@ -207,6 +209,7 @@ static Object *new_instance(const Class *cls) {
     return (Object *)app;
 }
 
+
 // free object
 void application_free_instance(const Class *cls, Object *self) {
     free(self);
@@ -222,9 +225,15 @@ static Object *application_new_instance(const Class *cls) {
 ApplicationClass applicationClass;
 ApplicationVTable application_vtable;
 
+static const char *get_name(ApplicationClass *cls) {
+    return cls->class_name;
+}
+
 static bool application_initialized = false;
 void ApplicationCreateClass() {
+    printf("ApplicationCreateClass:enter\n");
     if (!application_initialized) {
+        printf("ApplicationCreateClass:initializing\n");
         application_vtable.base = vTable;
 
         // application methods
@@ -243,10 +252,12 @@ void ApplicationCreateClass() {
         // init the application class
         applicationClass.base = class;
         applicationClass.base.vtable = (VTable *)&application_vtable;
-        applicationClass.base.class_name = strdup("Application");
+        applicationClass.class_name = strdup("Application");
+        applicationClass.get_name = get_name;
         applicationClass.base.new_instance = application_new_instance;
         applicationClass.base.free = application_free_instance;
 
         application_initialized = true;
     }
+    printf("ApplicationCreateClass:leave\n");
 }
