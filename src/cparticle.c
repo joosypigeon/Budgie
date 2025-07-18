@@ -35,6 +35,7 @@ static void integrate(Particle *particle, buReal duration) {
 
 static void set(Particle *particle, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass) {
     particle->_position = position;
+    particle->_initial_position = position; // Store initial position
     particle->_velocity = velocity;
     particle->_acceleration = acceleration;
     particle->_damping = damping;
@@ -98,6 +99,30 @@ static buVector3 getAcceleration(Particle *particle) {
     return particle->_acceleration;
 }
 
+static buReal getKE(Particle *particle) {
+    assert(particle->_inverseMass > 0.0f); // Ensure inverse mass is positive
+    buReal mass = 1.0 / particle->_inverseMass;
+    buReal speedSquared = buVector3Dot(particle->_velocity, particle->_velocity);
+    return 0.5 * mass * speedSquared;
+}
+
+static buReal getPE(Particle *particle, buReal y) {
+    // Potential Energy = m * g * h
+    // Assuming g = 9.81 m/s^2 (standard gravity)
+    assert(particle->_inverseMass > 0.0); // Ensure inverse mass is positive
+    buReal mass = 1.0 / particle->_inverseMass;
+    const buReal g = 9.81;
+    buReal height = particle->_position.y - y; // Height relative to y
+    return mass * g * height;
+}
+
+static buReal getEnergy(Particle *particle) {
+    // Total Energy = Kinetic Energy + Potential Energy
+    buReal ke = getKE(particle);
+    buReal pe = getPE(particle, particle->_initial_position.y);
+    return ke + pe;
+}
+
 static void clearAccumulator(Particle *particle) {
     particle->_forceAccum = (buVector3){0.0, 0.0, 0.0};
 }
@@ -106,12 +131,18 @@ static void addForce(Particle *particle, const buVector3 force) {
     particle->_forceAccum = buVector3Add(particle->_forceAccum, force);
 }
 
+static buVector3 getForceAccum(Particle *particle) {
+    return particle->_forceAccum;
+}
+
 ParticleClass particleClass;
 ParticleVTable particle_vtable;
 
 // free object
 void particle_free_instance(const Class *cls, Object *self) {
+    printf("Particle::free_instance:enter\n");
     free(self);
+    printf("Particle::free_instance:leave\n");
 }
 
 // new object
@@ -151,6 +182,10 @@ void ParticleCreateClass() {
         particle_vtable.getAcceleration = getAcceleration,
         particle_vtable.clearAccumulator = clearAccumulator,
         particle_vtable.addForce = addForce,
+        particle_vtable.getForceAccum = getForceAccum,
+        particle_vtable.getKE = getKE,
+        particle_vtable.getPE = getPE,
+        particle_vtable.getEnergy = getEnergy, 
 
         // init the particle class
         particleClass.base = class; // inherit from Class

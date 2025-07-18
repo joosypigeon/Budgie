@@ -33,6 +33,11 @@ struct ParticleVTable {
     buVector3 (*getAcceleration)(Particle *particle);
     void (*clearAccumulator)(Particle *particle);
     void (*addForce)(Particle *particle, const buVector3 force);
+    buVector3 (*getForceAccum)(Particle *particle);
+
+    buReal (*getKE)(Particle *particle);
+    buReal (*getPE)(Particle *particle, buReal y); // PE relative to y
+    buReal (*getEnergy)(Particle *particle); // KE + PE
 };
 
 typedef struct Particle {
@@ -42,6 +47,7 @@ typedef struct Particle {
     buReal _inverseMass;
     buReal _damping;
     buVector3 _position;
+    buVector3 _initial_position; // initial position
     buVector3 _velocity;
     buVector3 _forceAccum;
     buVector3 _acceleration; 

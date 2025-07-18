@@ -79,11 +79,13 @@ static Object *vector_new_instance(const Class *cls) {
 
 // free object
 void vector_free_instance(const Class *cls, Object *self) {
+    printf("Vector::free_instance:enter\n");
     if (self) {
         Vector *vector = (Vector *)self;
         free(vector->_items);
         free(vector);
     }
+    printf("Vector::free_instance:leave\n");    
 }
 
 VectorClass vectorClass = {

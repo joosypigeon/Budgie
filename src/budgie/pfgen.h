@@ -19,7 +19,7 @@ typedef struct ParticleForceGeneratorVTable ParticleForceGeneratorVTable;
 struct ParticleForceGeneratorVTable {
     VTable base; // inherit from VTable
 
-    void (*updateForce)(ParticleForceGenerator *self, Particle *particle, buReal duration);
+    void (*updateForce)(const ParticleForceGenerator *self, Particle *particle, buReal duration);
 };
 
 typedef struct ParticleForceGenerator {
@@ -30,7 +30,7 @@ struct ParticleForceGeneratorClass {
     Class base; // inherit from Class
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleForceGeneratorClass *cls);
+    const char *(*get_name)(const ParticleForceGeneratorClass *cls);
 };
 
 void ParticleForceGeneratorCreateClass();
@@ -57,10 +57,13 @@ struct ParticleGravityClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleGravityClass *cls);
-    ParticleGravity *(*new_instance)(ParticleGravityClass *cls, const buVector3 *gravity);
+    const char *(*get_name)(const ParticleGravityClass *cls);
+    ParticleGravity *(*new_instance)(const ParticleGravityClass *cls, buVector3 gravity);
     void (*free)(const ParticleGravityClass *cls, ParticleGravity *self);
 };
+
+extern ParticleGravityClass particleGravityClass;
+void ParticleGravityCreateClass();
 
 ///////////////////////////////////////////////////////////////////
 // ParticleDrag - applies a drag force to a particle
@@ -84,8 +87,8 @@ struct ParticleDragClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleDragClass *cls);
-    ParticleDrag *(*new_instance)(ParticleDragClass *cls, buReal k1, buReal k2);
+    const char *(*get_name)(const ParticleDragClass *cls);
+    ParticleDrag *(*new_instance)(const ParticleDragClass *cls, buReal k1, buReal k2);
     void (*free)(const ParticleDragClass *cls, ParticleDrag *self);
 };
 
@@ -112,10 +115,13 @@ struct ParticleAnchoredSpringClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleAnchoredSpringClass *cls);
-    ParticleAnchoredSpring *(*new_instance)(ParticleAnchoredSpringClass *cls, buVector3 anchor, buReal springConstant, buReal restLength);
+    const char *(*get_name)(const ParticleAnchoredSpringClass *cls);
+    ParticleAnchoredSpring *(*new_instance)(const ParticleAnchoredSpringClass *cls, buVector3 anchor, buReal springConstant, buReal restLength);
     void (*free)(const ParticleAnchoredSpringClass *cls, ParticleAnchoredSpring *self);
 };
+
+extern ParticleAnchoredSpringClass particleAnchoredSpringClass; // singleton object is the class
+void ParticleAnchoredSpringCreateClass();
 
 ///////////////////////////////////////////////////////////////////
 // ParticleAnchoredBungee - applies a bungee force to a particle
@@ -140,8 +146,8 @@ struct ParticleAnchoredBungeeClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleAnchoredBungeeClass *cls);
-    ParticleAnchoredBungee *(*new_instance)(ParticleAnchoredBungeeClass *cls, buVector3 anchor, buReal springConstant, buReal restLength);
+    const char *(*get_name)(const ParticleAnchoredBungeeClass *cls);
+    ParticleAnchoredBungee *(*new_instance)(const ParticleAnchoredBungeeClass *cls, buVector3 anchor, buReal springConstant, buReal restLength);
     void (*free)(const ParticleAnchoredBungeeClass *cls, ParticleAnchoredBungee *self);
 };
 
@@ -168,8 +174,8 @@ struct ParticleFakeSpringClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleFakeSpringClass *cls);
-    ParticleFakeSpring *(*new_instance)(ParticleFakeSpringClass *cls, buVector3 anchor, buReal springConstant, buReal damping);
+    const char *(*get_name)(const ParticleFakeSpringClass *cls);
+    ParticleFakeSpring *(*new_instance)(const ParticleFakeSpringClass *cls, buVector3 anchor, buReal springConstant, buReal damping);
     void (*free)(const ParticleFakeSpringClass *cls, ParticleFakeSpring *self);
 };
 
@@ -197,10 +203,13 @@ struct ParticleSpringClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleSpringClass *cls);
-    ParticleSpring *(*new_instance)(ParticleSpringClass *cls, Particle *other, buReal springConstant, buReal restLength);
+    const char *(*get_name)(const ParticleSpringClass *cls);
+    ParticleSpring *(*new_instance)(const ParticleSpringClass *cls, Particle *other, buReal springConstant, buReal restLength);
     void (*free)(const ParticleSpringClass *cls, ParticleSpring *self);
 };
+
+extern ParticleSpringClass particleSpringClass; // singleton object is the class
+void ParticleSpringCreateClass();
 
 ///////////////////////////////////////////////////////////////////
 // ParticleBungee - applies a spring force only when extended.
@@ -231,8 +240,8 @@ struct ParticleBungeeClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleBungeeClass *cls);
-    ParticleBungee *(*new_instance)(ParticleBungeeClass *cls, Particle *other, buReal springConstant, buReal restLength);
+    const char *(*get_name)(const ParticleBungeeClass *cls);
+    ParticleBungee *(*new_instance)(const ParticleBungeeClass *cls, Particle *other, buReal springConstant, buReal restLength);
     void (*free)(const ParticleBungeeClass *cls, ParticleBungee *self);
 };
 
@@ -278,8 +287,8 @@ struct ParticleBuoyancyClass {
     ParticleForceGeneratorClass base;
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleBuoyancyClass *cls);
-    ParticleBuoyancy *(*new_instance)(ParticleBuoyancyClass *cls, buReal maxDepth, buReal volume, buReal waterHeight, buReal liquidDensity);
+    const char *(*get_name)(const ParticleBuoyancyClass *cls);
+    ParticleBuoyancy *(*new_instance)(const ParticleBuoyancyClass *cls, buReal maxDepth, buReal volume, buReal waterHeight, buReal liquidDensity);
     void (*free)(const ParticleBuoyancyClass *cls, ParticleBuoyancy *self);
 };
 
@@ -337,11 +346,12 @@ typedef struct ParticleForceRegistryClass {
     Class base; // inherit from Class
 
     const char *class_name; // class name
-    const char *(*get_name)(ParticleForceRegistryClass *cls);
-    ParticleForceRegistry *(*new_instance)(ParticleForceRegistryClass *cls);
+    const char *(*get_name)(const ParticleForceRegistryClass *cls);
+    ParticleForceRegistry *(*new_instance)(const ParticleForceRegistryClass *cls);
     void (*free)(const ParticleForceRegistryClass *cls, ParticleForceRegistry *self);
 } ParticleForceRegistryClass;
 
 extern ParticleForceRegistryClass particleForceRegistryClass; // singleton object is the class
+void ParticleForceRegistryCreateClass();
 
 #endif // PFGEN_H

@@ -1,5 +1,9 @@
 #include "budgie/pfgen.h"
+#include "budgie/precision.h"
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 
 //////////////////////////////////////////////////////////////////
 // ParticleForceGenerator interface
@@ -7,7 +11,7 @@
 ParticleForceGeneratorClass particleForceGeneratorClass;
 ParticleForceGeneratorVTable pfg_vtable;
 
- static void pfg_updateForce(ParticleForceGenerator *self, Particle *particle, buReal duration) {
+ static void pfg_updateForce(const ParticleForceGenerator *self, Particle *particle, buReal duration) {
     // This is an abstract method, should be overridden in derived classes
     assert(false && "updateForce must be implemented in derived classes");  
  }
@@ -25,7 +29,7 @@ static Object *pfg_new_instance(const Class *cls) {
     return (Object *)NULL;
 }
 
-static const char *get_name(ParticleForceGeneratorClass *cls) {
+static const char *get_name(const ParticleForceGeneratorClass *cls) {
     return cls->class_name;
 }
 
@@ -63,7 +67,7 @@ static ParticleGravity *pg_new_instance(const ParticleGravityClass *cls, buVecto
     ParticleGravity *p = malloc(sizeof(ParticleGravity));
     assert(p);  // Check for allocation failure
     p->_gravity = gravity;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -72,7 +76,7 @@ void pg_free_instance(const ParticleGravityClass *cls, ParticleGravity *self) {
     free(self);
 }
 
-void pg_updateForce(ParticleForceGenerator *self, Particle *particle, buReal duration) {
+void pg_updateForce(const ParticleForceGenerator *self, Particle *particle, buReal duration) {
     // Check that we do not have infinite mass
     if (!INSTANCE_METHOD_AS(ParticleVTable, particle, hasFiniteMass)) return;
 
@@ -84,7 +88,7 @@ void pg_updateForce(ParticleForceGenerator *self, Particle *particle, buReal dur
 }
 
 
-static const char *pg_get_name(ParticleGravityClass *cls) {
+static const char *pg_get_name(const ParticleGravityClass *cls) {
     return cls->class_name;
 }
 
@@ -93,6 +97,7 @@ void ParticleGravityCreateClass() {
     printf("ParticleGravityCreateClass:enter\n");
     if (!pg_initialized) {
         printf("ParticleGravityCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pg_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -124,7 +129,7 @@ static ParticleDrag *pd_new_instance(const ParticleDragClass *cls, buReal k1, bu
     assert(p);  // Check for allocation failure
     p->_k1 = k1;
     p->_k2 = k2;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -133,7 +138,7 @@ void pd_free_instance(const ParticleDragClass *cls, ParticleDrag *self) {
     free(self);
 }
 
-void pd_updateForce(ParticleForceGenerator *self, Particle* particle, buReal duration) {
+void pd_updateForce(const ParticleForceGenerator *self, Particle* particle, buReal duration) {
     buVector3 force = INSTANCE_METHOD_AS(ParticleVTable, particle, getVelocity);
 
     // Calculate the total drag coefficient
@@ -146,7 +151,7 @@ void pd_updateForce(ParticleForceGenerator *self, Particle* particle, buReal dur
     INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
 }
 
-static const char *pd_get_name(ParticleDragClass *cls) {
+static const char *pd_get_name(const ParticleDragClass *cls) {
     return cls->class_name;
 }
 
@@ -155,6 +160,7 @@ void ParticleDragCreateClass() {
     printf("ParticleDragCreateClass:enter\n");
     if (!pd_initialized) {
         printf("ParticleDragCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pd_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -190,7 +196,7 @@ static ParticleAnchoredSpring *pas_new_instance(
     p->_anchor = anchor;
     p->_springConstant = springConstant;
     p->_restLength = restLength;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -214,7 +220,7 @@ void pas_updateForce(const ParticleForceGenerator *self, Particle* particle, buR
     INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
 }
 
-static const char *pas_get_name(ParticleAnchoredSpringClass *cls) {
+static const char *pas_get_name(const ParticleAnchoredSpringClass *cls) {
     return cls->class_name;
 }
 
@@ -223,6 +229,7 @@ void ParticleAnchoredSpringCreateClass() {
     printf("ParticleAnchoredSpringCreateClass:enter\n");
     if (!pas_initialized) {
         printf("ParticleAnchoredSpringCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pas_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -239,6 +246,78 @@ void ParticleAnchoredSpringCreateClass() {
         pas_initialized = true;
     }
     printf("ParticleAnchoredSpringCreateClass:leave\n");
+}
+
+
+
+///////////////////////////////////////////////////////////////////
+// ParticleSpring - applies a Spring force to a particle
+///////////////////////////////////////////////////////////////////
+ParticleSpringClass particleSpringClass;
+ParticleSpringVTable ps_vtable;
+
+// new object
+static ParticleSpring *ps_new_instance(
+                                    const ParticleSpringClass *cls,
+                                    Particle *other, buReal sc, buReal rl) {
+    ParticleSpring *p = malloc(sizeof(ParticleSpring));
+    assert(p);  // Check for allocation failure
+    p->_other = other;
+    p->_springConstant = sc;
+    p->_restLength = rl;
+    ((Object *)p)->klass = (Class *)cls;
+    return p;
+}
+
+// free object
+void ps_free_instance(const ParticleSpringClass *cls, ParticleSpring *self) {
+    free(self);
+}
+
+void ps_updateForce(const ParticleForceGenerator *self, Particle* particle, buReal duration)
+{
+    // Calculate the vector of the spring
+    buVector3 force = INSTANCE_METHOD_AS(ParticleVTable, particle, getPosition);
+    buVector3 other = INSTANCE_METHOD_AS(ParticleVTable, ((ParticleSpring *)self)->_other, getPosition);
+    force = buVector3Difference(force, other);
+
+    // Calculate the magnitude of the force
+    buReal magnitude = buVector3Norm(force);
+    magnitude = magnitude - ((ParticleSpring *)self)->_restLength;
+    magnitude *= ((ParticleSpring *)self)->_springConstant;
+
+    // Calculate the final force and apply it
+    force = buVector3Normalise(force);
+    force = buVector3Scalar(force, -magnitude);
+    INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
+}
+
+static const char *ps_get_name(const ParticleSpringClass *cls) {
+    return cls->class_name;
+}
+
+static bool ps_initialized = false;
+void ParticleSpringCreateClass() {
+    printf("ParticleSpringCreateClass:enter\n");
+    if (!ps_initialized) {
+        printf("ParticleSpringCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
+        ps_vtable.base = pfg_vtable; // inherit from VTable
+
+        // methods
+        ps_vtable.base.updateForce = ps_updateForce;
+
+        // init the particle class
+        particleSpringClass.base = particleForceGeneratorClass; // inherit from Class
+        particleSpringClass.base.base.vtable = (VTable *)&ps_vtable;
+        particleSpringClass.new_instance = ps_new_instance;
+        particleSpringClass.free = ps_free_instance;
+        particleSpringClass.class_name = strdup("ParticleSpring");
+        particleSpringClass.get_name = ps_get_name;
+
+        ps_initialized = true;
+    }
+    printf("ParticleSpringCreateClass:leave\n");
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -260,7 +339,7 @@ static ParticleBuoyancy *pb_new_instance(
     p->_volume = volume;
     p->_waterHeight = waterHeight;
     p->_liquidDensity = liquidDensity;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -292,7 +371,7 @@ void pb_updateForce(const ParticleForceGenerator *self, Particle* particle, buRe
     INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
 }
 
-static const char *pb_get_name(ParticleBuoyancyClass *cls) {
+static const char *pb_get_name(const ParticleBuoyancyClass *cls) {
     return cls->class_name;
 }
 
@@ -301,6 +380,7 @@ void ParticleBuoyancyCreateClass() {
     printf("ParticleBuoyancyCreateClass:enter\n");
     if (!pb_initialized) {
         printf("ParticleBuoyancyCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pb_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -334,7 +414,7 @@ static ParticleAnchoredBungee *pab_new_instance(
     p->_anchor = anchor;
     p->_springConstant = sc;
     p->_restLength = rl;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -343,17 +423,17 @@ void pab_free_instance(const ParticleAnchoredBungeeClass *cls, ParticleAnchoredB
     free(self);
 }
 
-void pab_updateForce(const ParticleAnchoredBungee *self, Particle* particle, buReal duration) {
+void pab_updateForce(const ParticleForceGenerator *self, Particle* particle, buReal duration) {
     // Calculate the vector of the spring
     buVector3 force = INSTANCE_METHOD_AS(ParticleVTable, particle, getPosition);
-    force = buVector3Difference(force, self->_anchor);
+    force = buVector3Difference(force, ((ParticleAnchoredBungee *)self)->_anchor);
 
     // Calculate the magnitude of the force
     buReal magnitude = buVector3Norm(force);
-    if (magnitude < self->_restLength) return;
+    if (magnitude < ((ParticleAnchoredBungee *)self)->_restLength) return;
 
-    magnitude = magnitude - self->_restLength;
-    magnitude *= self->_springConstant;
+    magnitude = magnitude - ((ParticleAnchoredBungee *)self)->_restLength;
+    magnitude *= ((ParticleAnchoredBungee *)self)->_springConstant;
 
     // Calculate the final force and apply it
     force = buVector3Normalise(force);
@@ -361,7 +441,7 @@ void pab_updateForce(const ParticleAnchoredBungee *self, Particle* particle, buR
     INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
 }
 
-static const char *pab_get_name(ParticleAnchoredBungeeClass *cls) {
+static const char *pab_get_name(const ParticleAnchoredBungeeClass *cls) {
     return cls->class_name;
 }
 
@@ -370,6 +450,7 @@ void ParticleAnchoredBungeeCreateClass() {
     printf("ParticleAnchoredBungeeCreateClass:enter\n");
     if (!pab_initialized) {
         printf("ParticleAnchoredBungeeCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pab_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -404,7 +485,7 @@ static ParticleBungee *pbu_new_instance(
     p->_other = other;
     p->_springConstant = sc;
     p->_restLength = rl;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -432,7 +513,7 @@ void pbu_updateForce(const ParticleForceGenerator *self, Particle* particle, buR
     INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
 }
 
-static const char *pbu_get_name(ParticleBungeeClass *cls) {
+static const char *pbu_get_name(const ParticleBungeeClass *cls) {
     return cls->class_name;
 }
 
@@ -441,6 +522,7 @@ void ParticleBungeeCreateClass() {
     printf("ParticleBungeeCreateClass:enter\n");
     if (!pbu_initialized) {
         printf("ParticleBungeeCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pbu_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -459,74 +541,6 @@ void ParticleBungeeCreateClass() {
     printf("ParticleBungeeCreateClass:leave\n");
 }
 
-///////////////////////////////////////////////////////////////////
-// ParticleSpring - applies a Spring force to a particle
-///////////////////////////////////////////////////////////////////
-ParticleSpringClass particleSpringClass;
-ParticleSpringVTable ps_vtable;
-
-// new object
-static ParticleSpring *ps_new_instance(
-                                    const ParticleSpringClass *cls,
-                                    Particle *other, buReal sc, buReal rl) {
-    ParticleSpring *p = malloc(sizeof(ParticleSpring));
-    assert(p);  // Check for allocation failure
-    p->_other = other;
-    p->_springConstant = sc;
-    p->_restLength = rl;
-    ((Object *)p)->klass = cls;
-    return p;
-}
-
-// free object
-void ps_free_instance(const ParticleSpringClass *cls, ParticleSpring *self) {
-    free(self);
-}
-
-void ps_updateForce(const ParticleForceGenerator *self, Particle* particle, buReal duration)
-{
-    // Calculate the vector of the spring
-    buVector3 force = INSTANCE_METHOD_AS(ParticleVTable, particle, getPosition);
-    buVector3 other = INSTANCE_METHOD_AS(ParticleVTable, ((ParticleSpring *)self)->_other, getPosition);
-    force = buVector3Difference(force, other);
-
-    // Calculate the magnitude of the force
-    buReal magnitude = buVector3Norm(force);
-    magnitude = buAbs(magnitude - ((ParticleSpring *)self)->_restLength);
-    magnitude *= ((ParticleSpring *)self)->_springConstant;
-
-    // Calculate the final force and apply it
-    force = buVector3Normalise(force);
-    force = buVector3Scalar(force, -magnitude);
-    INSTANCE_METHOD_AS(ParticleVTable, particle, addForce, force);
-}
-
-static const char *ps_get_name(ParticleSpringClass *cls) {
-    return cls->class_name;
-}
-
-static bool ps_initialized = false;
-void ParticleSpringCreateClass() {
-    printf("ParticleSpringCreateClass:enter\n");
-    if (!ps_initialized) {
-        printf("ParticleSpringCreateClass:initializing\n");
-        ps_vtable.base = pfg_vtable; // inherit from VTable
-
-        // methods
-        ps_vtable.base.updateForce = ps_updateForce;
-
-        // init the particle class
-        particleSpringClass.base = particleForceGeneratorClass; // inherit from Class
-        particleSpringClass.base.base.vtable = (VTable *)&ps_vtable;
-        particleSpringClass.new_instance = ps_new_instance;
-        particleSpringClass.free = ps_free_instance;
-        particleSpringClass.class_name = strdup("ParticleSpring");
-        particleSpringClass.get_name = ps_get_name;
-
-        ps_initialized = true;
-    }
-    printf("ParticleSpringCreateClass:leave\n");
-}
 
 ///////////////////////////////////////////////////////////////////
 // ParticleFakeSpring - applies a fake spring force to a particle
@@ -543,7 +557,7 @@ static ParticleFakeSpring *pfs_new_instance(
     p->_anchor = anchor;
     p->_springConstant = sc;
     p->_damping = dam;
-    ((Object *)p)->klass = cls;
+    ((Object *)p)->klass = (Class *)cls;
     return p;
 }
 
@@ -583,7 +597,7 @@ void pfs_updateForce(const ParticleForceGenerator *self, Particle* particle, buR
 
 }
 
-static const char *pfs_get_name(ParticleFakeSpringClass *cls) {
+static const char *pfs_get_name(const ParticleFakeSpringClass *cls) {
     return cls->class_name;
 }
 
@@ -592,6 +606,7 @@ void ParticleFakeSpringCreateClass() {
     printf("ParticleFakeSpringCreateClass:enter\n");
     if (!pfs_initialized) {
         printf("ParticleFakeSpringCreateClass:initializing\n");
+        ParticleForceGeneratorCreateClass();
         pfs_vtable.base = pfg_vtable; // inherit from VTable
 
         // methods
@@ -656,7 +671,9 @@ void pfr_updateForces(ParticleForceRegistry *self, buReal duration) {
 
 // free object
 void pfr_free_instance(const Class *cls, Object *self) {
+    printf("ParticleForceRegistry::free_instance:enter\n");
     free(self);
+    printf("ParticleForceRegistry::free_instance:leave\n");
 }
 
 // new object
@@ -668,7 +685,7 @@ static Object *pfr_new_instance(const Class *cls) {
     return (Object *)pfg;
 }
 
-static const char *pfr_get_name(ParticleForceRegistryClass *cls) {
+static const char *pfr_get_name(const ParticleForceRegistryClass *cls) {
     return cls->class_name;
 }
 
@@ -691,7 +708,7 @@ void ParticleForceRegistryCreateClass() {
         particleForceRegistryClass.base.new_instance = pfr_new_instance;
         particleForceRegistryClass.base.free = pfr_free_instance;
         particleForceRegistryClass.class_name = strdup("Particle");
-        particleForceRegistryClass.get_name = get_name;
+        particleForceRegistryClass.get_name = pfr_get_name;
 
         pfr_initialized = true;
     }

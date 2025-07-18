@@ -10,6 +10,9 @@
 #define INSTANCE_METHOD_AS(vtable_type, obj, method, ...) \
     (((vtable_type *)(((Object *)obj)->klass->vtable))->method((obj), ##__VA_ARGS__))
 
+#define CLASS_METHOD_AS(class_type, cls, method, ...) \
+    ((class_type *)cls)->method(((class_type *)cls), ##__VA_ARGS__)
+
 #define UNUSED(x) (void)(x)
 
 typedef struct Object Object;

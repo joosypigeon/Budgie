@@ -151,6 +151,49 @@ endif()
 
 
 
+# === Define spring demo target ===
+set(DEMO_DIR ${SRC_DIR}/demos)
+set(SPRING_DIR ${SRC_DIR}/demos/spring)
+
+file(GLOB SPRING_DEMO_SOURCES
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/main.c
+    ${SPRING_DIR}/spring.c
+
+)
+
+# Only include specific core sources (not main.c)
+set(CORE_SOURCES
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/random.c
+    ${SRC_DIR}/oop.c
+    ${SRC_DIR}/vector.c
+    ${SRC_DIR}/pfgen.c
+)
+
+add_executable(demo_spring ${SPRING_DEMO_SOURCES} ${CORE_SOURCES})
+
+# Raylib + OpenMP linkage
+find_package(raylib REQUIRED)
+target_link_libraries(demo_spring raylib m)
+
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    target_link_libraries(demo_spring OpenMP::OpenMP_C)
+    message(STATUS "OpenMP found and linked for demo_spring")
+else()
+    message(WARNING "OpenMP not found; demo_spring may fail if OpenMP is used")
+endif()
+
+
+
+
+
+
+
+
 
 
 # === Enable testing framework ===

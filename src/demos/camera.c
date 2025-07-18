@@ -6,7 +6,7 @@ void UpdateCameraManual(Camera3D *camera)
     static float cameraYaw = PI / 4.0f;
     static float cameraPitch = PI / 4.0f; 
     static float cameraDistance = 100.0f;
-    static Vector3 target = { 0.0f, 0.0f, 0.0f };
+    static Vector3 target = { 0.0f, 100.0f, 0.0f };
 
     float wheel = GetMouseWheelMove();
     cameraDistance -= wheel * 100.0f;

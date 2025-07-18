@@ -14,6 +14,8 @@
     #define buPow powf
     #define buAbs fabsf
     #define buLog logf
+    #define buExp expf
+    #define buSin sinf
     #define buCos cosf
     #define REAL_FMT         "%f"
     #define REAL_MAX         FLT_MAX
@@ -27,6 +29,8 @@
     #define buPow pow
     #define buAbs fabs
     #define buLog log
+    #define buExp exp
+    #define buSin sin
     #define buCos cos
     #define REAL_MAX         DBL_MAX
     #define REAL_MIN         DBL_MIN
