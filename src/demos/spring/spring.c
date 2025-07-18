@@ -42,7 +42,7 @@ void init(Application *self) {
     ParticleSpringCreateClass();
     ParticleGravityCreateClass();
     ParticleForceRegistryCreateClass();
-    ParticleForceRegistryCreateClass();
+
 
     assert(particles); // Check for allocation failure
 

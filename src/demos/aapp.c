@@ -36,7 +36,7 @@ float HALF_SCREEN_HEIGHT;
 // rate which we don't know in advance
 static float frameTime = 0.0;
 static buReal physics_duration = 0.0;
-static const buReal physics_delta = 1.0 / 6000.0;
+static const buReal physics_delta = 1.0 / 600.0;
 static const int max_physics_steps = 100;
 static Camera3D camera = {0};
 static Light lights[MAX_LIGHTS] = { 0 };

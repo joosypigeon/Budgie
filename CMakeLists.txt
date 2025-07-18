@@ -192,6 +192,55 @@ endif()
 
 
 
+# === Define projection demo target ===
+set(DEMO_DIR ${SRC_DIR}/demos)
+set(PROJECTION_DIR ${SRC_DIR}/demos/projection)
+
+file(GLOB PROJECTION_DEMO_SOURCES
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/main.c
+    ${PROJECTION_DIR}/projection.c
+
+)
+
+# Only include specific core sources (not main.c)
+set(CORE_SOURCES
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/random.c
+    ${SRC_DIR}/oop.c
+    ${SRC_DIR}/vector.c
+    ${SRC_DIR}/pfgen.c
+)
+
+add_executable(demo_projection ${PROJECTION_DEMO_SOURCES} ${CORE_SOURCES})
+
+# Raylib + OpenMP linkage
+find_package(raylib REQUIRED)
+target_link_libraries(demo_projection raylib m)
+
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    target_link_libraries(demo_projection OpenMP::OpenMP_C)
+    message(STATUS "OpenMP found and linked for demo_projection")
+else()
+    message(WARNING "OpenMP not found; demo_projection may fail if OpenMP is used")
+endif()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
