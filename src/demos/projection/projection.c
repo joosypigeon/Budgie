@@ -10,37 +10,51 @@
 #include <assert.h>
 #include "raylib.h"
 #include "raymath.h"
+#include "raygui.h"
+
 #include "../camera.h"
+
+#define COLOR_TO_STYLE(c) ((c.r << 24) | (c.g << 16) | (c.b << 8) | (c.a))
 
 #define DAMPING 1.0
 #define PARTICLE_MASS 1.0
 #define PARTICLE_SIZE 10.0
 #define PARTICLE_COLOR RED
 
-#define INITIAL_SPEED 100
-
 #define TARGET (Vector3){0.0, 0.0, 0.0}
 #define CAMERA_DISTANCE 3000.0
 #define CAMERA_PITCH 0.5
 #define CAMERA_YAW 0.5
 
-
-
+#define MIN_INITIAL_SPEED 50
+#define MAX_INITIAL_SPEED 300
 
 bool pause = false;
 
 buReal total_energy = -1.0;
 
-const buVector3 gravity = (buVector3){0.0, -9.81, 0.0};
+const buReal g = 9.81;
+const buVector3 gravity = (buVector3){0.0, -g, 0.0};
 
 Particle *particle = NULL;
 ParticleForceRegistry *forceRegistry; /** Holds the force registry. */
 
+buReal initial_speed = 100.0;
+buReal old_initail_speed = -1.0;
 buVector3 initial_velocity = (buVector3){0.0, 0.0, 0.0};
+buReal angle_of_elevation = 89.0;
+buReal old_angle_of_elevation = -1.0;
+
+buReal theory_range = -1.0;
+buReal range = -1.0;
+buReal theory_max_height = -1.0;
+buReal max_height = -1.0;
+buReal current_range = -1.0;
+buReal current_max_height = -1.0;
 
 void setProjectionParameters() {
     buVector3 position = (buVector3){0.0, 0.0, 0.0};
-    buVector3 velocity = buVector3Scalar((buVector3){INITIAL_SPEED, INITIAL_SPEED, 0.0}, 1.0 / buSqrt(2.0));
+    buVector3 velocity = (buVector3){initial_speed*buCos(angle_of_elevation*DEG2RAD), initial_speed*buSin(angle_of_elevation*DEG2RAD), 0.0};
     buVector3 acceleration = (buVector3){0.0, 0.0, 0.0};
     INSTANCE_METHOD_AS(ParticleVTable, particle, set, position, velocity, acceleration, DAMPING, PARTICLE_MASS);
 }
@@ -75,6 +89,9 @@ void init(Application *self) {
     setCameraPitch(CAMERA_PITCH);
     setCameraYaw(CAMERA_YAW);
 
+    GuiSetStyle(DEFAULT, TEXT_SIZE, 32);
+    GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, COLOR_TO_STYLE(BLUE));
+
     printf("projection::init:leave\n");
 }
 
@@ -102,7 +119,28 @@ void update(Application *self, buReal duration) {
 
     buVector3 position = INSTANCE_METHOD_AS(ParticleVTable, particle, getPosition);
     if (position.y < 0.0) {
+        current_max_height = max_height;
+        current_range = range;
+        max_height = -1.0;
+        range = -1.0;
         setProjectionParameters();
+    }
+
+    if(old_angle_of_elevation != angle_of_elevation || old_initail_speed != initial_speed) {
+        theory_range = initial_speed * initial_speed * buSin(2*angle_of_elevation*DEG2RAD) / g;
+        theory_max_height = buPow(initial_speed* buSin(angle_of_elevation*DEG2RAD), 2) / (2.0 * g);
+        old_angle_of_elevation = angle_of_elevation;
+        old_initail_speed = initial_speed;
+        range = -1.0;
+        max_height = -1.0;
+    }
+
+    if (range < position.x) {
+        range = position.x;
+    }
+
+    if (max_height < position.y) {
+        max_height = position.y;
     }
 }
 
@@ -118,10 +156,26 @@ void keyboard(Application *self, KeyboardKey key) {
 
 void display_info(Application *self, size_t Y, size_t d){
     DrawText(TextFormat("Total Energy: %0.2f", total_energy), 20, Y, 30, BLUE);
+    DrawText(TextFormat("range (predicted %.2f) %.2f ", theory_range, current_range), 20, Y + d, 30, BLUE);
+    DrawText(TextFormat("max height (predicted %.2f)  %.2f ", theory_max_height, current_max_height), 20, Y + 2*d, 30, BLUE);
     DrawText(TextFormat("Gravity: (%.2f, %.2f, %.2f)",
              gravity.x, gravity.y, gravity.z),
-             20, Y + d, 30, BLUE);
-             
+             20, Y + 3*d, 30, BLUE);
+
+    // Start the sliders below the text stats
+    Rectangle sliderBounds = { 700, Y, 300, 30 };
+
+    DrawText("initial speed", sliderBounds.x, sliderBounds.y - 40, 30, BLUE);
+    GuiSlider(sliderBounds,
+        TextFormat("%.2f", initial_speed),
+        NULL,
+        &initial_speed, MIN_INITIAL_SPEED, MAX_INITIAL_SPEED);
+    sliderBounds.y += 2*d;
+    DrawText("angle of elevation", sliderBounds.x, sliderBounds.y - 40, 30, BLUE);
+    GuiSlider(sliderBounds,
+        TextFormat("%.2f", angle_of_elevation),
+        NULL,
+        &angle_of_elevation, 0.0, 90.0);   
 }
 
 static Object *projection_new_instance(const Class *cls) {

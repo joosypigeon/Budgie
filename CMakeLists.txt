@@ -148,9 +148,6 @@ endif()
 
 
 
-
-
-
 # === Define spring demo target ===
 set(DEMO_DIR ${SRC_DIR}/demos)
 set(SPRING_DIR ${SRC_DIR}/demos/spring)
@@ -186,8 +183,6 @@ if(OpenMP_C_FOUND)
 else()
     message(WARNING "OpenMP not found; demo_spring may fail if OpenMP is used")
 endif()
-
-
 
 
 
@@ -231,22 +226,9 @@ endif()
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # === Enable testing framework ===
 enable_testing()
+
 
 # === Show helpful usage when `make` is run with no target ===
 add_custom_target(usage
@@ -255,7 +237,11 @@ add_custom_target(usage
     COMMAND ${CMAKE_COMMAND} -E echo "  make budgie               # Build the main application"
     COMMAND ${CMAKE_COMMAND} -E echo "  make run_tests_core       # Build core unit tests"
     COMMAND ${CMAKE_COMMAND} -E echo "  make run_tests_particle   # Build particle unit tests"
-    COMMAND ${CMAKE_COMMAND} -E echo "  make demo_ballistic          # Build Raylib demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make run_tests_vector     # Build vector unit tests"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make demo_ballistic       # Build ballistic demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make demo_fireworks       # Build fireworks demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make demo_spring          # Build spring demo"
+    COMMAND ${CMAKE_COMMAND} -E echo "  make demo_projection      # Build projection demo"
     COMMAND ${CMAKE_COMMAND} -E echo "  ctest                     # Run all tests using CTest"
     COMMAND ${CMAKE_COMMAND} -E echo ""
     VERBATIM

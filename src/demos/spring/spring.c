@@ -5,6 +5,7 @@
 #include "../timing.h"
 #include <stdio.h>
 #include "../../budgie/random.h"
+#include "../camera.h"
 #include <limits.h>
 #include <string.h>
 #include <assert.h>
@@ -21,7 +22,10 @@
 #define PARTICLE_COLOR (Color){255, 255, 255, 255}
 #define SPRING_COLOR MAROON
 
-
+#define TARGET (Vector3){0.0, 100.0, 0.0}
+#define CAMERA_DISTANCE 300.0
+#define CAMERA_PITCH 0.5
+#define CAMERA_YAW 0.5
 
 bool pause = false;
 
@@ -90,6 +94,12 @@ void init(Application *self) {
         buReal energy = INSTANCE_METHOD_AS(ParticleVTable, p, getEnergy);
         total_energy += energy;
     }
+
+    setTarget(TARGET);
+    setCameraDistance(CAMERA_DISTANCE);
+    setCameraPitch(CAMERA_PITCH);
+    setCameraYaw(CAMERA_YAW);
+
     printf("spring::init:leave\n");
 }
 
