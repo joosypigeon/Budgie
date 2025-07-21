@@ -12,12 +12,12 @@
 #include "raylib.h"
 #include "raymath.h"
 
-#define NUMBER_OF_PARTICLES 3
+#define NUMBER_OF_PARTICLES 10
 #define REST_LENGTH 10.0
 #define ANCHOR (buVector3){0.0, 100.0, 0.0}
-#define SPRING_CONSTANT 10.0
-#define DAMPING 0.99
-#define PARTICLE_MASS 1.0
+#define SPRING_CONSTANT 1.0
+#define DAMPING 0.9946
+#define PARTICLE_MASS 10.0
 #define PARTICLE_SIZE 1.0
 #define PARTICLE_COLOR (Color){255, 255, 255, 255}
 #define SPRING_COLOR MAROON
@@ -36,6 +36,28 @@ const buVector3 gravity = (buVector3){0.0, -9.81, 0.0};
 Particle *particles[NUMBER_OF_PARTICLES] = {NULL}; /** Holds the particles. */
 ParticleForceRegistry *forceRegistry; /** Holds the force registry. */
 
+buReal spring_PE(buVector3 start, buVector3 end) {
+    return 0.5 * SPRING_CONSTANT * buPow(buVector3Norm(buVector3Difference(end, start)) - REST_LENGTH, 2);
+}
+
+void getEnergy(){
+    total_energy = 0.0;
+    buVector3 start;
+    buVector3 end;
+    for (size_t i = 0; i < NUMBER_OF_PARTICLES; i++) {
+        Particle *p = particles[i];
+        buReal energy = INSTANCE_METHOD_AS(ParticleVTable, p, getEnergy);
+        total_energy += energy;
+        if(i==0){
+            start = INSTANCE_METHOD_AS(ParticleVTable, p, getPosition);
+            total_energy += spring_PE(ANCHOR, start);
+            continue;
+        }
+        end = INSTANCE_METHOD_AS(ParticleVTable, p, getPosition);
+        total_energy += spring_PE(start, end);
+        start = end;
+    }
+}
 
 void init(Application *self) {
     printf("spring::init:enter\n");
@@ -55,7 +77,7 @@ void init(Application *self) {
         Particle *p = (Particle *)CLASS_METHOD(&particleClass, new_instance);
         assert(p); // Check for allocation failure
         buVector3 position = buVector3Add((buVector3){0.0, - (i + 1) * REST_LENGTH, 0.0}, ANCHOR);
-        buVector3 velocity = i == NUMBER_OF_PARTICLES - 1 ? (buVector3){100.0, 0.0, 0.0} : buRandomVectorByRange(&(buVector3){-10.0, -10.0, -10.0}, &(buVector3){10.0, 10.0, 10.0});
+        buVector3 velocity = i == NUMBER_OF_PARTICLES - 1 ? (buVector3){100.0, 0.0, 0.0} : buRandomVectorByRange(&(buVector3){-1.0, -1.0, -1.0}, &(buVector3){1.0, 1.0, 1.0});
         buVector3 acceleration = {0.0, 0.0, 0.0};
         INSTANCE_METHOD_AS(ParticleVTable, p, set, position, velocity, acceleration, DAMPING, PARTICLE_MASS);
         particles[i] = p; // Store the particle
@@ -88,13 +110,12 @@ void init(Application *self) {
     for (int i = 0; i < NUMBER_OF_PARTICLES; i++) {
         INSTANCE_METHOD_AS(ParticleForceRegistryVTable, forceRegistry, add, particles[i], gravityForce);
     }
-    total_energy = 0.0;
-    for (int i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        Particle *p = particles[i];
-        buReal energy = INSTANCE_METHOD_AS(ParticleVTable, p, getEnergy);
-        total_energy += energy;
-    }
 
+
+    // Calculate total energy
+    getEnergy();
+
+    // set camera
     setTarget(TARGET);
     setCameraDistance(CAMERA_DISTANCE);
     setCameraPitch(CAMERA_PITCH);
@@ -117,11 +138,16 @@ const char* getTitle(Application *self) {
 
 
 void update(Application *self, buReal duration) {
+    // clear force registers in particles
     for(size_t i = 0; i < NUMBER_OF_PARTICLES; i++) {
         Particle *particle = particles[i];
         INSTANCE_METHOD_AS(ParticleVTable, particle, clearAccumulator);
     }
+
+    // update forces
     INSTANCE_METHOD_AS(ParticleForceRegistryVTable, forceRegistry, updateForces, duration);
+
+    // do physics
     for(size_t i = 0; i < NUMBER_OF_PARTICLES; i++) {
         Particle *particle = particles[i];
         buReal inverseMass = INSTANCE_METHOD_AS(ParticleVTable, particle, getInverseMass);
@@ -130,13 +156,9 @@ void update(Application *self, buReal duration) {
         INSTANCE_METHOD_AS(ParticleVTable, particle, setAcceleration, buVector3Scalar(force, inverseMass));
         INSTANCE_METHOD_AS(ParticleVTable, particle, integrate, duration);
     }
+
     // Calculate total energy
-    total_energy = 0.0;
-    for (size_t i = 0; i < NUMBER_OF_PARTICLES; i++) {
-        Particle *p = particles[i];
-        buReal energy = INSTANCE_METHOD_AS(ParticleVTable, p, getEnergy);
-        total_energy += energy;
-    }
+    getEnergy();
 }
 
 
