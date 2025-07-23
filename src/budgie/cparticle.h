@@ -61,6 +61,7 @@ typedef struct ParticleClass {
 } ParticleClass;
 
 extern ParticleClass particleClass; // singleton object is the class
+extern ParticleVTable particle_vtable;
 
 extern void ParticleCreateClass();
 #endif // CPARTICLE_H
