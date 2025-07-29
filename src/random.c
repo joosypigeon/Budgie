@@ -51,12 +51,17 @@ buReal buRandomBinomial(buReal scale) {
     return (buRandCrossNormalised()-buRandCrossNormalised())*scale;
 }
 
-buQuaternion buRandomQuaternion() {
-    buQuaternion q = (buQuaternion) {
-                        buRandCrossNormalised(),
-                        buRandCrossNormalised(),
-                        buRandCrossNormalised(),
-                        buRandCrossNormalised()};
+buQuaternion buRandomUnitQuaternion() {
+    buQuaternion q;
+    do {
+        q = (buQuaternion) {
+            buRandCrossNormalised(),
+            buRandCrossNormalised(),
+            buRandCrossNormalised(),
+            buRandCrossNormalised()
+        };
+    } while (q.r == 0.0f && q.i == 0.0f && q.j == 0.0f && q.k == 0.0f);
+
     buNormaliseQuaternion(&q);
     return q;
 }

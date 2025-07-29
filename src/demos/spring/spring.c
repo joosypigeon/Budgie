@@ -31,8 +31,6 @@ bool pause = false;
 
 buReal total_energy = -1.0;
 
-const buVector3 gravity = (buVector3){0.0, -9.81, 0.0};
-
 Particle *particles[NUMBER_OF_PARTICLES] = {NULL}; /** Holds the particles. */
 ParticleForceRegistry *forceRegistry; /** Holds the force registry. */
 
@@ -105,7 +103,7 @@ void init(Application *self) {
     }
 
     // Add gravity force generator to all particles
-    ParticleForceGenerator *gravityForce = (ParticleForceGenerator *)CLASS_METHOD_AS(ParticleGravityClass, &particleGravityClass, new_instance, gravity);
+    ParticleForceGenerator *gravityForce = (ParticleForceGenerator *)CLASS_METHOD_AS(ParticleGravityClass, &particleGravityClass, new_instance, GRAVITY);
     assert(gravityForce); // Check for allocation failure
     for (int i = 0; i < NUMBER_OF_PARTICLES; i++) {
         INSTANCE_METHOD_AS(ParticleForceRegistryVTable, forceRegistry, add, particles[i], gravityForce);
@@ -243,7 +241,7 @@ void display_info(Application *self, size_t Y, size_t d){
              ANCHOR.x, ANCHOR.y, ANCHOR.z),
              20, Y + 6 * d, 30, BLUE);
     DrawText(TextFormat("Gravity: (%.2f, %.2f, %.2f)",
-             gravity.x, gravity.y, gravity.z),
+             GRAVITY.x, GRAVITY.y, GRAVITY.z),
              20, Y + 7 * d, 30, BLUE);
              
 }

@@ -130,6 +130,8 @@ set(CORE_SOURCES
     ${SRC_DIR}/cparticle.c
     ${SRC_DIR}/random.c
     ${SRC_DIR}/oop.c
+    ${SRC_DIR}/vector.c
+    ${SRC_DIR}/pfgen.c
 )
 
 add_executable(demo_fireworks ${FIREWORKS_DEMO_SOURCES} ${CORE_SOURCES})
@@ -222,6 +224,47 @@ if(OpenMP_C_FOUND)
 else()
     message(WARNING "OpenMP not found; demo_projection may fail if OpenMP is used")
 endif()
+
+
+# === Define contact demo target ===
+set(DEMO_DIR ${SRC_DIR}/demos)
+set(CONTACT_DIR ${SRC_DIR}/demos/contact)
+
+file(GLOB CONTACT_DEMO_SOURCES
+    ${DEMO_DIR}/aapp.c
+    ${DEMO_DIR}/camera.c
+    ${DEMO_DIR}/main.c
+    ${CONTACT_DIR}/contact.c
+    ${CONTACT_DIR}/cube.c
+    ${CONTACT_DIR}/linalg3x3.c
+
+)
+
+# Only include specific core sources (not main.c)
+set(CORE_SOURCES
+    ${SRC_DIR}/core.c
+    ${SRC_DIR}/cparticle.c
+    ${SRC_DIR}/random.c
+    ${SRC_DIR}/oop.c
+    ${SRC_DIR}/vector.c
+    ${SRC_DIR}/pfgen.c
+    ${SRC_DIR}/pcontacts.c
+)
+
+add_executable(demo_contact ${CONTACT_DEMO_SOURCES} ${CORE_SOURCES})
+
+# Raylib + OpenMP linkage
+find_package(raylib REQUIRED)
+target_link_libraries(demo_contact raylib m)
+
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+    target_link_libraries(demo_contact OpenMP::OpenMP_C)
+    message(STATUS "OpenMP found and linked for demo_contact")
+else()
+    message(WARNING "OpenMP not found; demo_projection may fail if OpenMP is used")
+endif()
+
 
 
 

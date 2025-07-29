@@ -103,7 +103,7 @@ typedef struct ParticleContactResolverVTable {
     /**
      * Sets the number of iterations that can be used.
      */
-    void (*setIterations)(unsigned iterations);
+    void (*setIterations)(ParticleContactResolver *self, unsigned iterations);
 
     /**
      * Resolves a set of particle contacts for both penetration
@@ -134,7 +134,7 @@ typedef struct ParticleContactResolverVTable {
      * @param duration The duration of the previous integration step.
      * This is used to compensate for forces applied.
     */
-    void (*resolveContacts)(ParticleContact *contactArray,
+    void (*resolveContacts)(ParticleContactResolver *self,  ParticleContact **contactArray,
         unsigned numContacts,
         buReal duration);
 
@@ -171,6 +171,7 @@ typedef struct ParticleContactGenerator {
 } ParticleContactGenerator;
 
 typedef struct ParticleContactGeneratorVTable {
+    VTable base;
     /**
      * Fills the given contact structure with the generated
      * contact. The contact pointer should point to the first
@@ -179,13 +180,20 @@ typedef struct ParticleContactGeneratorVTable {
      * to. The method returns the number of contacts that have
      * been written.
      */
-    unsigned (*addContact)(ParticleContact *contact,
+    unsigned (*addContact)(ParticleContactGenerator *self, ParticleContact *contact,
                                 unsigned limit);
 } ParticleContactGeneratorVTable;
 
 
+typedef struct ParticleContactGeneratorClass {
+    Class base; // inherit from Class
+    
+    const char *class_name; // class name
+    const char *(*get_name)(ParticleContactGeneratorClass *cls);
+} ParticleContactGeneratorClass;
 
 extern ParticleContactGeneratorClass particleContactGeneratorClass;
+extern ParticleContactGeneratorVTable pcg_vtable;
 void ParticleContactGeneratorCreateClass();
 
-#endif // CONTACTS_H
+#endif // PCONTACTS_H

@@ -42,6 +42,11 @@ static Camera3D camera = {0};
 static Light lights[MAX_LIGHTS] = { 0 };
 static Shader shader = {0};
 
+static Shader getShader(Application *self) {
+    
+    return shader;
+}
+
 static const char *getTitle(Application *self) {
     return "title";
 }
@@ -250,6 +255,7 @@ void ApplicationCreateClass() {
         application_vtable.keyboard = keyboard;
         application_vtable.mouseButtonPressed = mouseButtonPressed;
         application_vtable.update = update;
+        application_vtable.getShader = getShader;
 
         // init the application class
         applicationClass.base = class;

@@ -7,6 +7,7 @@
 #include "vector.h"
 #include "oop.h"
 
+extern const buVector3 GRAVITY;
 
 //////////////////////////////////////////////////////////////////
 // ParticleForceGenerator interface

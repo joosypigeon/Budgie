@@ -10,7 +10,7 @@ buReal buRandCrossNormalised();
 buReal buRandomReal(buReal min, buReal max);
 int buRandomInt(unsigned max);
 buReal buRandomBinomial(buReal scale);
-buQuaternion buRandomQuaternion();
+buQuaternion buRandomUnitQuaternion();
 buVector3 buRandomVectorByScale(buReal scale);
 buVector3 buRandomXZVector(buReal scale);
 buVector3 buRandomVectorByVector(const buVector3 *scale);

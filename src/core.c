@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include "budgie/core.h"
 
-const buVector3 GRAVITY = { (buReal)0.0, (buReal)-9.81, (buReal)0.0 };
-
 void buCopyFromTo(buVector3 from, buVector3 *to) {
     to->x = from.x;
     to->y = from.y;
@@ -114,4 +112,15 @@ void buNormaliseQuaternion(buQuaternion *q) {
         q->j = j*d;
         q->k = k*d;
     }
+}
+
+buReal buQuaternionLength(buQuaternion q) {
+    buReal r = q.r, i = q.i, j = q.j, k = q.k;
+    buReal d = r*r+i*i+j*j+k*k;
+    return buSqrt(d);
+}
+
+buVector3 buDivideVectorComponents(buVector3 a, buVector3 b) {
+    assert(b.x != 0.0 && b.y != 0.0 && b.z != 0.0);
+    return (buVector3){a.x/b.x, a.y/b.y, a.z/b.z};
 }

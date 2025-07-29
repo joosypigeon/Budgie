@@ -4,6 +4,7 @@
 #include "../timing.h"
 #include <stdio.h>
 #include "../../budgie/random.h"
+#include "../../budgie/pfgen.h"
 #include <limits.h>
 #include <string.h>
 #include "raylib.h"

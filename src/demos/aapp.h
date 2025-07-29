@@ -26,6 +26,7 @@ struct ApplicationVTable {
     void (*keyboard)(Application *self, KeyboardKey key);
     void (*mouseButtonPressed)(Application *self, MouseButton button);
     void (*update)(Application *self, buReal physics_delta);
+    Shader (*getShader)(Application *self);
 };
 
 struct Application {

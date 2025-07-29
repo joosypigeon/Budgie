@@ -6,7 +6,17 @@
 #include "../../budgie/core.h"
 #include "../../budgie/oop.h"
 #include "../../budgie/cparticle.h"
+#include "../../budgie/vector.h"
+#include "../../budgie/pcontacts.h"
+#include "linalg3x3.h"
 #include <stdbool.h>
+
+typedef struct Corner {
+    buVector3 r_b;
+    buVector3 r_w;
+    buReal restitution;
+    buVector3 normal;
+} Corner;
 
 typedef struct Cube Cube;
 typedef struct CubeClass CubeClass;
@@ -16,45 +26,40 @@ typedef struct CubeVTable CubeVTable;
 struct CubeVTable {
     ParticleVTable base; // inherit from ParticleVTableVTable
 
-    void (*integrate)(Cube *self, buReal duration);
-    void (*integrate)(Cube *self, buReal duration);
-    void (*set)(Cube *self, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass);
-    void (*setMass)(Cube *self, const buReal mass);
-    buReal (*getMass)(Cube *self);
-    void (*setInverseMass)(Cube *self, const buReal inverseMass);
-    buReal (*getInverseMass)(Cube *self);
-    bool (*hasFiniteMass)(Cube *self);
-    void (*setDamping)(Cube *self, const buReal damping);
-    buReal (*getDamping)(Cube *self);
-    void (*setPosition)(Cube *self, const buVector3 position);
-    buVector3 (*getPosition)(Cube *self);
-    void (*setVelocity)(Cube *self, const buVector3 velocity);
-    buVector3 (*getVelocity)(Cube *self);
-    void (*setAcceleration)(Cube *self, const buVector3 acceleration);
-    buVector3 (*getAcceleration)(Cube *self);
-    void (*setAngularVelocity)(Cube *self, const buVector3 angularVelocity);
-    buVector3 (*getAngularVelocity)(Cube *self);
-    void (*setAngularAcceleration)(Cube *self, const buVector3 acceleration);
-    buVector3 (*getAngularAcceleration)(Cube *self);
+    void (*integrateRigidBody)(Cube *self, buReal duration);
+    void (*setRigidBody)(
+                Cube *self,
+                buVector3 position,
+                buReal length,
+                buVector3 velocity,
+                buVector3 acceleration, 
+                buReal damping,
+                buReal inverseMass,
+                Matrix3x3 R, // Rotation matrix (body to world)
+                buVector3 omega_b // Angular velocity (body frame)
+            );
+
     void (*clearTorqueAccumulator)(Cube *self);
     void (*addTorque)(Cube *self, const buVector3 torque);
     buVector3 (*getTorqueAccum)(Cube *self);
-    void (*clearAccumulator)(Cube *self);
-    void (*addForce)(Cube *self, const buVector3 force);
-    buVector3 (*getForceAccum)(Cube *self);
-    void (*addTorque)(Cube *self, const buVector3 torque);
-    buVector3 (*getTorqueAccum)(Cube *self);
-    buReal (*getKE)(Cube *self);
-    buReal (*getPE)(Cube *self, buReal y); // PE relative to y
-    buReal (*getEnergy)(Cube *self); // KE + PE
+
+    // This is a horrid hack to apply impluse to corners below ground
+    void (*applyCornerImpluse)(
+        Cube *self,
+        Corner **corners,
+        unsigned numContacts);
 };
 
 typedef struct Cube {
     Particle base;
 
-    buVector3 _angularVelocity;
+    buReal _length; // Length of the cube
+    Matrix3x3 _Lambda;       // Inertia tensor in body frame (diagonal)
+    Matrix3x3 _R; // Rotation matrix (body to world)
+    buVector3 _omega_b; // Angular velocity (body frame)
     buVector3 _torqueAccum;
-    buVector3 _angularAcceleration; 
+
+    Vector *_corners;
 } Cube;
 
 typedef struct CubeClass {
@@ -66,4 +71,6 @@ typedef struct CubeClass {
 
 extern CubeClass cubeClass; // singleton object is the class
 extern void CubeCreateClass();
+
+
 #endif // CUBE_H

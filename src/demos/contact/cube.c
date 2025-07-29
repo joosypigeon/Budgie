@@ -4,107 +4,49 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cube.h"
+#include "linalg3x3.h"
+
 
 // Method definitions
 
-static void integrate(Cube *self, buReal duration) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, integrate, duration);
-}
-
-static void set(
+static void setRigidBody(
                 Cube *self,
                 buVector3 position,
+                buReal length,
                 buVector3 velocity,
                 buVector3 acceleration, 
-                buVector3 angularVelocity,
-                buVector3 angularAcceleration,
                 buReal damping,
-                buReal inverseMass) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, set, position, velocity, acceleration, damping, inverseMass);
-    self->_angularVelocity = angularVelocity;
-    self->_angularAcceleration = angularAcceleration;
+                buReal inverseMass,
+                Matrix3x3 R, // Rotation matrix (body to world)
+                buVector3 omega_b // Angular velocity (body frame)
+            ) {
+    //printf("Cube::setRigidBody:enter\n");
+    INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, set, position, velocity, acceleration, damping, inverseMass);
+    assert(inverseMass > 0.0);
+    self->_length = length;
+    self->_Lambda = Matrix3x3ScalarMultiply(I3, 1.0/6.0*(1/inverseMass)*length*length);
+    self->_R = R;
+    self->_omega_b = omega_b;
+    Vector *corners = (Vector *)CLASS_METHOD(&vectorClass, new_instance);
+    float s = length / 2.0f;
+
+    for (int dx = -1; dx <= 1; dx += 2) {
+        for (int dy = -1; dy <= 1; dy += 2) {
+            for (int dz = -1; dz <= 1; dz += 2) {
+                buVector3 *corner = malloc(sizeof(buVector3));
+                assert(corner); // Check for allocation failure
+                corner->x = dx * s;
+                corner->y = dy * s;
+                corner->z = dz * s;
+                //printf("Cube::setRigidBody:corner:(%f, %f, %f)\n", corner->x, corner->y, corner->z);
+                INSTANCE_METHOD_AS(VectorVTable, corners, push, corner);
+            }
+        }
+    }
+    self->_corners = corners;
+    //printf("Cube::setRigidBody:leave\n");
 }
 
-static void setMass(Cube *self, const buReal mass) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, setMass, mass);
-}
-
-static buReal getMass(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getMass);
-}
-
-static void setInverseMass(Cube *self, const buReal inverseMass) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, setInverseMass, inverseMass);
-}
-
-static buReal getInverseMass(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getInverseMass);
-}
-
-static bool hasFiniteMass(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, hasFiniteMass);
-}
-
-static void setDamping(Cube *self, const buReal damping) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, setDamping, damping);
-}
-
-buReal getDamping(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getDamping);
-}
-
-static void setPosition(Cube *self, const buVector3 position) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, setPosition, position);
-}
-
-static buVector3 getPosition(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getPosition);
-}
-
-static void setVelocity(Cube *self, const buVector3 velocity) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, setVelocity, velocity);
-}
-
-static buVector3 getVelocity(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getVelocity);
-}
-
-static void setAcceleration(Cube *self, const buVector3 acceleration) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, setAcceleration, acceleration);
-}
-
-static buVector3 getAcceleration(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getAcceleration);
-}
-
-static buReal getKE(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getKE);
-}
-
-static buReal getPE(Cube *self, buReal y) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getPE, y);
-}
-
-static buReal getEnergy(Cube *self) {
-    // Total Energy = Kinetic Energy + Potential Energy
-    buReal ke = INSTANCE_METHOD_AS(ParticleVTable, self, getKE);
-    buReal pe = INSTANCE_METHOD_AS(ParticleVTable, self, getPE, self->base._initial_position.y);
-    // Need to add the rotational eneregy as well!!!
-    return ke + pe;
-}
-
-static void clearAccumulator(Cube *self) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, clearAccumulator);
-    self->_torqueAccum = (buVector3){0.0, 0.0, 0.0};
-}
-
-static void addForce(Cube *self, const buVector3 force) {
-    INSTANCE_METHOD_AS(ParticleVTable, self, addForce, force);
-}
-
-static buVector3 getForceAccum(Cube *self) {
-    return INSTANCE_METHOD_AS(ParticleVTable, self, getForceAccum);
-}
 
 static void addTorque(Cube *self, const buVector3 torque) {
     self->_torqueAccum = buVector3Add(self->_torqueAccum, torque);
@@ -114,12 +56,134 @@ static buVector3 getTorqueAccum(Cube *self) {
     return self->_torqueAccum;
 } 
 
+static void clearTorqueAccumulator(Cube *self) {
+    self->_torqueAccum = (buVector3){0.0, 0.0, 0.0};
+}
+
+static void checkCorners(Cube *self) {
+    //printf("Cube::checkCorners:enter\n");
+    for (size_t i = 0; i < self->_corners->_length; i++) {
+        buVector3 *corner = INSTANCE_METHOD_AS(VectorVTable, self->_corners, get, i);
+        buVector3 worldCorner = Matrix3x3MultiplyVector(self->_R, *corner);
+        worldCorner = buVector3Add(worldCorner, ((Particle *)self)->_position);
+        // Check if corner is below ground
+        if (worldCorner.y < 0.0) {
+            // Reset position to initial position
+            printf("Cube::checkCorners:corner %zu is below ground, (%f, %f, %f)\n", i, worldCorner.x, worldCorner.y, worldCorner.z);
+        }
+    }
+    //printf("Cube::checkCorners:leave\n");
+}
+
+
+void integrateRigidBody(Cube *self, buReal duration) {
+    //printf("cube::integrateRigidBody:enter: duration:%f\n", duration);
+    // --- Linear motion ---
+    buReal inverseMass = INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, getInverseMass);
+    buVector3 force = INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, getForceAccum);
+    INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, setAcceleration, buVector3Scalar(force, inverseMass));
+    INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, integrate, duration);
+    // --- Angular motion in body frame ---
+    buVector3 domega_b;
+
+    // Compute Lambda⁻¹ * (τ_b - ω_b × (Lambda * ω_b))
+    buVector3 Iw = Matrix3x3MultiplyVector(self->_Lambda, self->_omega_b);
+    buVector3 cross = buVector3Cross(self->_omega_b, Iw);
+    buVector3 rhs = buVector3Difference(self->_torqueAccum, cross);
+    domega_b = buDivideVectorComponents(rhs, Matrix3x3Diagonal(self->_Lambda));
+    //printf("domega_b:(%f, %f, %f)\n",domega_b.x,domega_b.y,domega_b.z);
+    // Integrate angular velocity
+    self->_omega_b = buVector3Add(self->_omega_b, buVector3Scalar(domega_b, duration));
+
+    //printf("self->_omega_b: (%f, %f, %f)\n",self->_omega_b.x,self->_omega_b.y,self->_omega_b.z);
+    // --- Update orientation matrix ---
+    // Convert ω_b to world frame: ω = R * ω_b
+    buVector3 omega_world = Matrix3x3MultiplyVector(self->_R, self->_omega_b);
+
+    // Skew-symmetric matrix [ω]^
+    Matrix3x3 omega_skew = {
+        0,              -omega_world.z, omega_world.y,
+        omega_world.z,  0,              -omega_world.x,
+        -omega_world.y, omega_world.x,  0 };
+    // R(t+dt) ≈ R(t) + dt * [ω]^ * R(t)
+    Matrix3x3 dR = Matrix3x3Multiply(omega_skew, self->_R);
+
+    self->_R = Matrix3x3Add(self->_R, Matrix3x3ScalarMultiply(dR, duration));
+
+    // Re-orthonormalize R here to prevent drift
+    self->_R = Matrix3x3Reorthonormalize(self->_R);
+
+    //checkCorners(self);
+
+    //printf("cube::integrateRigidBody:leave\n");
+}
+
+// This is a horrid hack to apply impluse to corners below ground
+static void applyCornerImpluse(
+        Cube *self,
+        Corner **corners,
+        unsigned numContacts) {
+    //printf("Cube::applyCornerImpluse:enter: numContacts:%u\n", numContacts);
+    // In the world frame, the inertia tensor is I = R * Lambda * R^T
+    // where R is the rotation matrix and Lambda is the inertia tensor in the body frame.
+    // For a cube, the inertia tensor in the body frame is diagonal:
+    // Lambda = diag(1/6 * m * l^2, 1/6 * m * l^2, 1/6 * m * l^2)
+    // where m is the mass and l is the length of the cube.
+    // Hence in the world frame, the inertia tensor is:
+    // I = R * 1/6 * m * l^2 * I_3 * R^T = 1/6 * m * l^2 * (R * I_3 * R^T)
+    // where I_3 is the 3x3 identity matrix.
+    // So I = Lambda for a cube.
+    // Hence I_inv = 6 / (m * l^2) * I_3
+    buReal m = INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, getMass);
+    buReal l = self->_length;
+    buReal lamnda_inv =  6.0 / (m * l * l);
+    buVector3 l_inv = (buVector3){lamnda_inv, lamnda_inv, lamnda_inv};
+
+
+    buVector3 omega_w = Matrix3x3MultiplyVector(self->_R, self->_omega_b);
+    buVector3 velocity = INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, getVelocity);
+    buVector3 cubeCenter = INSTANCE_METHOD_AS(ParticleVTable, (Particle *)self, getPosition);
+
+    for(size_t i = 0; i < numContacts; i++) {
+        Corner *corner = corners[i];
+
+        buVector3 n = corner->normal; // Contact normal
+        buVector3 r_b = corner->r_b; // Relative position from cube center to corner in body frame
+        buVector3 r_w = corner->r_w; // Relative position from cube center to corner in world frame
+        buVector3 cornerVelocity = buVector3Add(velocity, buVector3Cross(omega_w, r_w));
+        buReal J_n =-(1.0 + corner->restitution) * buVector3Dot(cornerVelocity, n)
+                / (1/m + buVector3Dot(
+                            n,
+                            buVector3Cross(
+                                buVector3ComponentProduct(
+                                    l_inv,
+                                    buVector3Cross(r_w, n)),
+                                r_w)));
+        buVector3 J_w = buVector3Scalar(n, J_n);
+        buVector3 J_b = Matrix3x3MultiplyVector(Matrix3x3Transpose(self->_R), J_w);
+        buVector3 delta_omega_b = buVector3ComponentProduct(l_inv, buVector3Cross(r_b, J_b));
+
+        printf("Cube::applyCornerImpluse:corner r_w:(%f, %f, %f) r_b:(%f, %f, %f) J_n:%f J_w:(%f, %f, %f) J_b:(%f, %f, %f) delta_omega_b:(%f, %f, %f)\n",
+            r_w.x, r_w.y, r_w.z,
+            r_b.x, r_b.y, r_b.z,
+            J_n,
+            J_w.x, J_w.y, J_w.z,
+            J_b.x, J_b.y, J_b.z,
+            delta_omega_b.x, delta_omega_b.y, delta_omega_b.z);
+
+        self->_omega_b = buVector3Add(self->_omega_b, delta_omega_b);
+    }  
+    //printf("Cube::applyCornerImpluse:leave\n"); 
+}
+
 CubeClass cubeClass;
 CubeVTable cube_vtable;
 
 // free object
 void cube_free_instance(const Class *cls, Object *self) {
     printf("Particle::free_instance:enter\n");
+    Cube *cube = (Cube *)self;
+    CLASS_METHOD(&vectorClass, free, (Object *)cube->_corners);
     free(self);
     printf("Particle::free_instance:leave\n");
 }
@@ -145,29 +209,13 @@ void CubeCreateClass() {
         cube_vtable.base = particle_vtable; // inherit from VTable
 
         // methods
-        cube_vtable.integrate = integrate,
-        cube_vtable.set = set,
-        cube_vtable.setMass = setMass,
-        cube_vtable.getMass = getMass,
-        cube_vtable.setInverseMass = setInverseMass,
-        cube_vtable.getInverseMass = getInverseMass,
-        cube_vtable.hasFiniteMass = hasFiniteMass,
-        cube_vtable.setDamping = setDamping,
-        cube_vtable.getDamping = getDamping,
-        cube_vtable.setPosition = setPosition,
-        cube_vtable.getPosition = getPosition,
-        cube_vtable.setVelocity = setVelocity,
-        cube_vtable.getVelocity = getVelocity,
-        cube_vtable.setAcceleration = setAcceleration,
-        cube_vtable.getAcceleration = getAcceleration,
-        cube_vtable.clearAccumulator = clearAccumulator,
-        cube_vtable.addForce = addForce,
-        cube_vtable.getForceAccum = getForceAccum,
-        cube_vtable.addTorque = addTorque,
-        cube_vtable.getTorqueAccum = getTorqueAccum,
-        cube_vtable.getKE = getKE,
-        cube_vtable.getPE = getPE,
-        cube_vtable.getEnergy = getEnergy, 
+        cube_vtable.integrateRigidBody = integrateRigidBody;
+        cube_vtable.setRigidBody = setRigidBody;
+        cube_vtable.addTorque = addTorque;
+        cube_vtable.getTorqueAccum = getTorqueAccum;
+        cube_vtable.clearTorqueAccumulator = clearTorqueAccumulator;
+        cube_vtable.applyCornerImpluse = applyCornerImpluse;
+
 
         // init the particle class
         cubeClass.base = particleClass; // inherit from Class
@@ -181,3 +229,4 @@ void CubeCreateClass() {
     }
     printf("CubeCreateClass:leave\n");
 }
+

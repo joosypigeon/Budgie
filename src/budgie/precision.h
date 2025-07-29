@@ -17,6 +17,7 @@
     #define buExp expf
     #define buSin sinf
     #define buCos cosf
+    #define buAcos acosf
     #define REAL_FMT         "%f"
     #define REAL_MAX         FLT_MAX
     #define REAL_MIN         FLT_MIN
@@ -32,6 +33,7 @@
     #define buExp exp
     #define buSin sin
     #define buCos cos
+    #define buAcos acos
     #define REAL_MAX         DBL_MAX
     #define REAL_MIN         DBL_MIN
     #define REAL_EPSILON     DBL_EPSILON

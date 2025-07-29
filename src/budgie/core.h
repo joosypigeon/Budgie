@@ -26,8 +26,6 @@ typedef union {
     buReal data[4];
 } buQuaternion;
 
-extern const buVector3 GRAVITY;
-
 buReal buVector3Norm(buVector3 v);
 buReal buVector3SquareNorm(buVector3 v);
 buVector3 buVector3Normalise(buVector3 v);
@@ -38,6 +36,9 @@ buVector3 buVector3ComponentProduct(buVector3 a, buVector3 b);
 buReal buVector3Dot(buVector3 a, buVector3 b);
 buVector3 buVector3Cross(buVector3 a, buVector3 b);
 buCoordinateFrame buMakeVector3OrthonormalBasis(buVector3 u, buVector3 v, buVector3 w);
-
 void buNormaliseQuaternion(buQuaternion *q);
+buReal buQuaternionLength(buQuaternion q);
+buVector3 buDivideVectorComponents(buVector3 a, buVector3 b);
+
+
 #endif // CORE_H

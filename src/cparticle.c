@@ -34,12 +34,14 @@ static void integrate(Particle *particle, buReal duration) {
 }
 
 static void set(Particle *particle, buVector3 position, buVector3 velocity, buVector3 acceleration, buReal damping, buReal inverseMass) {
+    //printf("Particle::set::enter\n");
     particle->_position = position;
     particle->_initial_position = position; // Store initial position
     particle->_velocity = velocity;
     particle->_acceleration = acceleration;
     particle->_damping = damping;
     particle->_inverseMass = inverseMass;
+    //printf("Particle::set::leave\n");
 }
 
 static void setMass(Particle *particle, const buReal mass) {
